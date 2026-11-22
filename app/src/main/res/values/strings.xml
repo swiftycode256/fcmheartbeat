@@ -25,6 +25,8 @@
     <string name="binding_error">Error</string>
     <string name="binding_connecting">Connecting</string>
     <string name="binding_error_not_found">Service not found or access denied</string>
+    <string name="binding_error_ping_failed">Service not responding (ping failed)</string>
+    <string name="binding_error_ping_timeout">Service not responding (no reply within %1$d s)</string>
 
     <!-- Message cards & alerts -->
     <string name="msg_all_ok_title">All service bindings operational</string>

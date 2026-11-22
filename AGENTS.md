@@ -92,6 +92,13 @@ A single process-wide state holder (`HeartbeatState`, a `StateFlow`) is the sour
   - `onServiceDisconnected`: Connecting. The system re-binds on its own once GMS restarts, so do nothing.
   - `onBindingDied`: unbind and re-bind right away. The system will not reconnect a dead binding.
 - Retry loop: while any binding is in Error or GMS is unavailable, a coroutine retries every 15 s (re-checking GMS first). `MainActivity.onResume` triggers an immediate retry.
+- **Ping loop (HyperOS Greezer workaround):**
+  - Every 4 s, the service calls `pingBinder()` on each binding that returned a binder. In practice that's only the Ads ID service; the FCM proxy returns a null binding.
+  - A synchronous binder call into a frozen GMS makes Greezer thaw it (`sync_binder2`). The interval is below Greezer's 5 s quick-freeze timeout (`fz_timeout=5000`).
+  - The ping runs on an IO thread with a 2 s timeout, since a call into a frozen process may block. Only one ping per binding is in flight at a time.
+  - On failure (`pingBinder()` false or timeout), that binding becomes `Error("Service not responding …")`. The status stays Active, with the "Some services failed to bind" warning and alert.
+  - The next successful ping sets it back to Connected, which clears the warning and cancels the alert.
+  - Pings that take more than 200 ms are logged under the `GmsBindingManager` tag, which makes thaws visible.
 
 ## Freeze detection & running time
 

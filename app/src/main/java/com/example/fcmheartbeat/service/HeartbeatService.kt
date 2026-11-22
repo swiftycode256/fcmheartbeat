@@ -42,7 +42,7 @@ class HeartbeatService : LifecycleService() {
 
     override fun onCreate() {
         super.onCreate()
-        bindings = GmsBindingManager(this)
+        bindings = GmsBindingManager(this, lifecycleScope)
         // Keep the ongoing notification title in sync with the overall status.
         lifecycleScope.launch {
             HeartbeatRepository.state.map { it.status }.distinctUntilChanged().collect { status ->
@@ -105,7 +105,7 @@ class HeartbeatService : LifecycleService() {
                 runStartedAtMillis = System.currentTimeMillis(),
             )
         }
-        runJobs = listOf(startTicker(startElapsed), startRetryLoop())
+        runJobs = listOf(startTicker(startElapsed), startRetryLoop(), startPingLoop())
         bindings.refresh()
         Notifications.updateStatus(this, HeartbeatRepository.state.value.status)
     }
@@ -139,6 +139,14 @@ class HeartbeatService : LifecycleService() {
                 val totalFrozen = it.frozenMillis + frozen
                 it.copy(frozenMillis = totalFrozen, runningMillis = now - startElapsed - totalFrozen)
             }
+        }
+    }
+
+    /** Keeps GMS thawed under HyperOS Greezer and surfaces an unresponsive binding. */
+    private fun startPingLoop() = lifecycleScope.launch {
+        while (isActive) {
+            delay(GmsBindingManager.PING_INTERVAL_MILLIS)
+            bindings.ping()
         }
     }
 
