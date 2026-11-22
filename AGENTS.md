@@ -21,13 +21,13 @@ When opening the app, on device boot, or when the app window is closed in the ap
 - Create bindings to the relevant GMS/FCM services
     - Check whether Google Play Services are enabled on the device
 
-If acquiring the wake lock fails, it should not proceed and terminate the foreground service while displaying an error notification. If the app failed to bind to all services or GMS is not enabled on this device, it should still keep running but should display the "Errors detected" state in the app and the service notification. 
+If acquiring the wake lock fails, it should not proceed and terminate the foreground service, reporting it as an "Unable to start foreground service" error (with the wake lock exception message) in both the app and the error notification. There is no separate wake lock error type. If the app failed to bind to all services or GMS is not enabled on this device, it should still keep running but should display the "Errors detected" state in the app and the service notification. 
 
 For the service binding errors, the app should automatically retry every 15 seconds in the background or when its main interface is opened, and only post new error notifications when the error type or exception message differs. If the binding disconnects, it should attempt to automatically re-create the bindings in the background to prevent interruptions. 
 
 ### Notifications
 
-Example notifications are depicted in the `ui-drafts/Notifications.png`. The first two are the foreground service notifications, while the rest are error/warning messages. These two types of notifications should use separate channels/categories so the user can manage them separately.
+Example notifications are depicted in the `ui-drafts/Notifications.png`. The first two are the foreground service notifications (status title only, no running timer), while the rest are error/warning messages. These two types of notifications should use separate channels/categories so the user can manage them separately.
 
 ---
 
@@ -44,22 +44,26 @@ A single process-wide state holder (`HeartbeatState`, a `StateFlow`) is the sour
 | Starting | Service start requested, bindings not yet resolved | grey + loading indicator | none |
 | Active | Service running and **at least one** binding connected | green | Restart |
 | Errors detected | Service running but **every** binding failed, or GMS missing/disabled | yellow | Restart |
-| Failed to start | `startForegroundService`/`startForeground` threw, or the wake lock could not be acquired | red | Retry |
+| Failed to start | `startForegroundService`/`startForeground` threw, or the wake lock could not be acquired (both shown as "Unable to start foreground service" + exception message) | red | Retry |
 
 - A partial binding failure (some connected, some not) keeps the status **Active** and shows the yellow "Some services failed to bind" card (see `With warnings 2.png`).
 - A detected process freeze is a **warning only**: it shows the freeze card but never changes the status.
+- When the status is Failed to start, the bindings section shows the GMS-missing card if GMS is unavailable, otherwise the info card "Service bindings were not created" (see `Failed to start.png` and `Failed to start 2.png`).
 - **Restart** fully tears down (unbind, release wake lock, stop service) and starts again; the running time resets. **Retry** does the same from the failed state.
 
 ## Foreground service
 
 - Type `specialUse`. Manifest needs `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`, `WAKE_LOCK`, and a `<property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" …/>` on the service. Return `START_STICKY`.
-- **Startup order:** call `startForeground()` first (it must happen within a few seconds of `startForegroundService()`), then acquire the wake lock, then check GMS and bind. If the wake lock fails, call `stopForeground` + `stopSelf` and post the "Unable to acquire wake lock" notification.
+- **Startup order:** call `startForeground()` first (it must happen within a few seconds of `startForegroundService()`), then acquire the wake lock, then check GMS and bind. If the wake lock throws, call `stopForeground` + `stopSelf`, set status Failed to start, and post the "Unable to start foreground service" notification with the wake lock exception message.
+- Keep `android:stopWithTask="false"` (the default) so swiping the task away does not stop the service on stock Android.
 - Wake lock: `PARTIAL_WAKE_LOCK`, tag `FCMHeartbeat::Heartbeat`, acquired with no timeout and released in `onDestroy`. `acquire()` normally only throws when the permission is missing. If the system silently overrides a held wake lock, freeze detection is what catches it.
 - **Start triggers:**
   - `MainActivity.onStart` (the app is in the foreground, so this is always allowed)
   - `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED` receivers (the update kills the process). `specialUse` is not among the types Android 15 blocks from `BOOT_COMPLETED`.
   - `START_STICKY` restart after the process is killed
-  - `onTaskRemoved()`: schedule an exact alarm about 1 s out (`setExactAndAllowWhileIdle`) whose `PendingIntent.getForegroundService` restarts the service. Exact alarms are exempt from the Android 12+ background-start restriction. Needs `SCHEDULE_EXACT_ALARM`, or `USE_EXACT_ALARM` if the app is not distributed on Play.
+  - `onTaskRemoved()`: schedule an exact alarm about 1 s out (`setExactAndAllowWhileIdle`) that fires a `RestartReceiver` broadcast; the receiver calls `startForegroundService`. A broadcast from an exact alarm is exempt from the Android 12+ background-start restriction.
+    - Permissions: `USE_EXACT_ALARM` (API 33+, granted automatically) plus `SCHEDULE_EXACT_ALARM` with `maxSdkVersion="32"`.
+    - Check `canScheduleExactAlarms()` first. If it returns false, fall back to `setAndAllowWhileIdle`, which is best-effort only.
 - **Restarting from the background only works if the app is exempt from battery optimization** ("Unrestricted"). Otherwise a sticky or alarm restart can throw `ForegroundServiceStartNotAllowedException`. Catch it and post the "Unable to start foreground service" notification.
 - Restart is best-effort. If HyperOS *force-stops* the app on swipe (as opposed to killing the process), Android cancels its alarms and stops delivering its broadcasts until the user opens it again, and nothing can bring it back. Locking the task in the switcher is the mitigation (see README).
 
@@ -67,9 +71,18 @@ A single process-wide state holder (`HeartbeatState`, a `StateFlow`) is the sour
 
 - Manifest needs `<queries><package android:name="com.google.android.gms" /></queries>`. Without it, Android 11+ hides GMS from the app: package lookups fail and binds return `false`.
 - GMS available = `packageManager.getApplicationInfo("com.google.android.gms", 0).enabled` (a `NameNotFoundException` means not installed). Avoid the Play Services client library; it is not needed.
-- Bindings (both use explicit `setPackage("com.google.android.gms")`):
-  - Google Ads ID: `com.google.android.gms.ads.identifier.service.START`
-  - FCM: `com.google.android.gms.cloudmessaging.service.START` **(unverified: check that GMS actually exports it before relying on it; see Open questions)**
+- Bindings (both use explicit `setPackage("com.google.android.gms")`). Verified on the emulator (Android 17 / API 37, GMS 26.45.31) with `pm query-services`:
+
+  | UI label | Intent action | Resolves to | Exported / permission |
+  |---|---|---|---|
+  | Google Ads ID | `com.google.android.gms.ads.identifier.service.START` | `.ads.identifier.service.AdvertisingIdService` | yes / none |
+  | Firebase Cloud Messaging | `com.google.android.c2dm.intent.REGISTER` | `.gcm.PushMessagingRegistrarProxy` | yes / none |
+
+  - `com.google.android.gms.cloudmessaging.service.START` (from the original plan) **does not exist** ("No services found"), so it is not used.
+  - Binding only runs the proxy's `onCreate`/`onBind`, never `onStartCommand`, so it does **not** trigger an FCM registration. It is expected to return a null binder (`onNullBinding`), which still counts as Connected (see below).
+- **Which process gets elevated:** a binding raises only the process *hosting the bound service*. On the emulator's GMS build:
+  - There is no `com.google.android.gms.persistent` process. The FCM connection service (`.gcm.GcmService`) runs in the main `com.google.android.gms` process, the same process as both bound services, so either binding elevates the FCM process.
+  - Older GMS builds ran GCM in `.persistent`. If the HyperOS device does, the bindings would elevate the wrong process (see Open questions).
 - Flags: `BIND_AUTO_CREATE or BIND_IMPORTANT`. `BIND_IMPORTANT` asks the system to raise GMS to the client's (foreground-service) priority, which is the whole point. `BIND_INCLUDE_CAPABILITIES` (API 29+) can be tried as an experiment.
 - Per-binding state: `Connecting`, `Connected`, `Error(message)`.
   - `bindService` returning `false`: Error ("Service not found or permission denied"). Unbind anyway to release the connection.
@@ -85,9 +98,9 @@ A single process-wide state holder (`HeartbeatState`, a `StateFlow`) is the sour
 Do **not** count ticks: `delay(1000)` overshoots by a few ms per tick, which adds up to minutes over a day and would trigger false freeze warnings. Use gap measurement instead:
 
 - A ticker in the service runs every 1 s. On each tick: `gap = elapsedRealtime() - lastTick`. If `gap > 2000 ms`, add `gap - 1000` to `frozenMs` and record the event (start time, duration).
-- `runningTime = elapsedRealtime() - serviceStartElapsed - frozenMs`. This is the freeze-aware counter shown in the UI and the notification.
+- `runningTime = elapsedRealtime() - serviceStartElapsed - frozenMs`. This is the freeze-aware counter shown in the UI status card. The notification shows no timer.
 - Show the "Background activity restrictions detected" card when `frozenMs > 30 s` since the service started, with the total ("for 45s"). It stays visible until the service restarts.
-- Post the matching notification at most once per freeze event, and only for events that alone push the total past the threshold or add ≥ 30 s more.
+- Post the matching notification once per service run, when `frozenMs` first crosses 30 s. The de-dup key includes the service start time, so constant freezes don't spam notifications, but a restarted service can notify again.
 - `elapsedRealtime` includes deep sleep, so a device that suspends despite the wake lock also counts as frozen. That is intended, since it is the same failure.
 
 ## Power management detection
@@ -101,7 +114,7 @@ Do **not** count ticks: `delay(1000)` overshoots by a few ms per tick, which add
 
 ## Diagnostics button
 
-- Opens `ComponentName("com.google.android.gms", "com.google.android.gms.gcm.GcmDiagnostics")`. Enabled when GMS is available (re-checked on resume). Wrap `startActivity` in try/catch (`ActivityNotFoundException`, `SecurityException`) and show a snackbar on failure.
+- Opens `ComponentName("com.google.android.gms", "com.google.android.gms.gcm.GcmDiagnostics")`. Verified on the emulator: the activity is exported and launches. Enabled when GMS is available (re-checked on resume). Wrap `startActivity` in try/catch (`ActivityNotFoundException`, `SecurityException`) and show a snackbar on failure.
 
 ## Notifications
 
@@ -109,7 +122,19 @@ Do **not** count ticks: `delay(1000)` overshoots by a few ms per tick, which add
 - Channels:
   - `status`: importance LOW, no sound or badge, for the ongoing FGS notification
   - `alerts`: importance DEFAULT, for errors and warnings
-- **Status notification:** title = status, plus a chronometer (`setUsesChronometer(true)`, `setWhen(currentTimeMillis() - runningTime)`). The system draws the ticking clock, so the app does not post an update every second (that would be rate-limited and waste battery). Re-post only when the status changes or a freeze is detected (to re-base the chronometer on the freeze-aware time). Tapping it opens `MainActivity`. Note: on Android 14+ users can swipe the FGS notification away; the service keeps running.
+- **Status notification:** title = status ("Active" / "Errors detected"), no body text and no timer (`setShowWhen(false)`). Re-post only when the status changes. Tapping it opens `MainActivity`. Note: on Android 14+ users can swipe the FGS notification away; the service keeps running.
+- **Alert types:**
+
+  | Alert | Shown when |
+  |---|---|
+  | Background activity restrictions detected | a freeze crosses the threshold |
+  | Google Play Services not found or enabled | GMS is missing or disabled |
+  | Unable to bind to services | every binding failed |
+  | Some services failed to bind | some bindings failed |
+  | Unable to start foreground service | the service could not start; also covers wake lock failures |
+
+  - "Unable to bind to services" and "Some services failed to bind" replace each other: they share one notification ID.
+  - "Unable to start foreground service" is always posted, even when the start came from the open UI, since the user may leave. It is cancelled once the service starts successfully.
 - **Alert de-duplication:** keep the last posted `(type, message)` per alert type, persisted in `SharedPreferences` so a crash/restart loop does not spam. Post only when it differs. When the error clears, cancel its notification and forget the stored key, so a later recurrence notifies again.
 - Each alert type uses a fixed notification ID, so a newer alert replaces an older one of the same type.
 
@@ -129,13 +154,21 @@ Do **not** count ticks: `delay(1000)` overshoots by a few ms per tick, which add
   - error → `errorContainer`
 - Animate cards appearing and disappearing (`AnimatedVisibility`) so status changes don't cause jumps.
 
-## Dependencies to add / bump
+## Dependencies (applied in `gradle/libs.versions.toml`)
 
-- Compose BOM to the current stable, and `material3` ≥ 1.5 for the Expressive APIs (`MaterialExpressiveTheme`, `LoadingIndicator`, flexible app bars). Some are still `@ExperimentalMaterial3ExpressiveApi`, so opt in.
-- `lifecycle-runtime-compose` (`collectAsStateWithLifecycle`), `lifecycle-service` (`LifecycleService`), `kotlinx-coroutines-android`. Bump `core-ktx`, `activity-compose` and `lifecycle` to current versions.
+- **Compose BOM 2026.11.01**: Compose UI 1.13.0 and Material 3 **1.5.0**, which includes the Expressive APIs.
+  - These artifacts and `core` 1.19.1 declare `minCompileSdk=37` and need AGP ≥ 9.1. The project already uses compileSdk 37 and AGP 9.5.2.
+  - The opt-in for `ExperimentalMaterial3ExpressiveApi` is set in `app/build.gradle.kts`.
+- **Kotlin stays at 2.2.10.** AGP 9.5.2's built-in Kotlin bundles KGP 2.2.10, and the Compose compiler plugin version must match it. Compose 1.13 requires Kotlin ≥ 2.2. Bump Kotlin only together with AGP.
+- **Added:**
+  - `lifecycle-runtime-compose` (`collectAsStateWithLifecycle`)
+  - `lifecycle-service` (`LifecycleService`)
+  - `kotlinx-coroutines-android` 1.10.2, which works with the 2.2 compiler
+- **Bumped:** `core-ktx` 1.19.1, `activity-compose` 1.13.0, `lifecycle` 2.11.1, `androidx.test.ext:junit` 1.3.0, `espresso-core` 3.7.0.
 
-## Open questions
+## Open questions (need the HyperOS device)
 
-- Is `com.google.android.gms.cloudmessaging.service.START` a real exported service action? Verify on device with `adb shell pm query-services -a com.google.android.gms.cloudmessaging.service.START com.google.android.gms`. If not, choose another always-present GMS service action for the FCM binding.
-- Does HyperOS's per-app "No restrictions" battery setting map to `isIgnoringBatteryOptimizations() == true`? Verify on device. If not, the power-management card may stay visible after the user sets it.
-- `applicationId` is still `com.example.fcmheartbeat`. Change it before any release.
+- **GMS process layout:** run `adb shell ps -A | grep com.google.android.gms`. If a `com.google.android.gms.persistent` process exists, check where GCM lives with `adb shell dumpsys activity services com.google.android.gms/.gcm.GcmService | grep app=`. If GCM is in `.persistent`, the FCM binding needs a service that also runs there.
+- **"Unrestricted" mapping:** does HyperOS's per-app "No restrictions" battery setting make `isIgnoringBatteryOptimizations()` return true? The emulator can't answer this. If not, the power-management card will stay visible after the user changes the setting.
+- **`applicationId`** is still `com.example.fcmheartbeat`. Change it before any release.
+- **Distribution:** `USE_EXACT_ALARM` and `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` are restricted under Google Play policy. Both are fine for sideloading or GitHub releases. If the app is ever published on Play, revisit them.

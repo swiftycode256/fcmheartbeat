@@ -8,7 +8,7 @@ On certain Xiaomi HyperOS versions, its power management features actively restr
 
 ## Mechanism
 
-When the app is opened or on system startup, it creates a `specialUse` foreground service, binds itself to the FCM service `com.google.android.gms.cloudmessaging.service.START` and Google Ads ID service `com.google.android.gms.ads.identifier.service.START` (for redundancy) using `bindService`, and acquires a partial wake lock to prevent the system from restricting its background activity. It elevates the process priority of GMS through this service binding while it's active.
+When the app is opened or on system startup, it creates a `specialUse` foreground service, binds itself to the FCM registration service `com.google.android.c2dm.intent.REGISTER` and Google Ads ID service `com.google.android.gms.ads.identifier.service.START` (for redundancy) using `bindService`, and acquires a partial wake lock to prevent the system from restricting its background activity. It elevates the process priority of GMS through this service binding while it's active.
 
 When the app process is automatically terminated by power management features, it restarts the foreground service automatically in the background to prevent interruptions.
 
