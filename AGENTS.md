@@ -171,6 +171,16 @@ Do **not** count ticks: `delay(1000)` overshoots by a few ms per tick, which add
 - **GMS process layout:** the device runs GCM in the main `com.google.android.gms` process (no `.persistent` process), the same as the emulator. Both bindings therefore elevate the FCM connection process.
 - **"Unrestricted" mapping:** HyperOS's per-app "Unrestricted" battery setting does update Android's battery-optimization allowlist. This was checked with the hidden AOSP permission page, and other apps (e.g. Microsoft Authenticator) detect it, so `isIgnoringBatteryOptimizations()` is a reliable signal.
 
+- **Greezer freezes GMS despite the binding (HyperOS OS4.0.4.0 CN, 2026-11-22):**
+  - HyperOS's own freezer (`dumpsys greezer`) freezes the GMS uid (10122) 10–30 s after screen off. The freeze is logged as `FZ ... reason : screen_off ... resCtrl:SENSOR|NET_SOCKET|NET_CHAIN|NET_WAKELOCK`.
+  - The `NET_SOCKET`/`NET_CHAIN` restrictions kill the FCM socket within ~0.3 s. Every `Close err:20` (ERR_IO_FIN) in `dumpsys activity service com.google.android.gms/.gcm.GcmService` lines up with one of these freezes.
+  - It happens while FCMHeartbeat is running, bound with `BIND_IMPORTANT`, and GMS is at FGS proc state with network capability. Greezer ignores bindings, AOSP Doze allowlisting and proc state for GMS.
+  - The greezer dump shows `IM mGmsLimitEnabled : true`, and GMS's no-control reason is `whiteapp|systemblack`. Its frozen rate is ~0.80.
+  - GMS is only left unfrozen while visible, starting an activity, or charging (`sysblack_plugged`), so tests done while plugged in look fine.
+  - Apps whose HyperOS battery setting is "No restrictions" show `NO_RESTRICT_APP` and are never frozen. This app is one of them. Whether that setting also works for GMS (given `mGmsLimitEnabled`) is untested.
+  - After a binder-triggered thaw (`sync_binder2`), GMS is re-frozen with `quick freeze` (`SENSOR|NET_WAKELOCK|BINDER_PROXY`), which does not include the network restrictions.
+  - **Diagnose with:** `adb shell dumpsys greezer | grep -E "uid = 10122|uid=10122"` alongside the GcmService dump.
+
 ## Remaining notes
 
 - **`applicationId`** is still `com.example.fcmheartbeat`. Change it before any release.
