@@ -1,3 +1,62 @@
 <resources>
     <string name="app_name">FCMHeartbeat</string>
+
+    <!-- Toolbar -->
+    <string name="action_diagnostics">Open FCM diagnostics</string>
+    <string name="diagnostics_unavailable">Unable to open FCM diagnostics</string>
+
+    <!-- Sections -->
+    <string name="section_status">Status</string>
+    <string name="section_bindings">Service bindings</string>
+
+    <!-- Status -->
+    <string name="status_starting">Starting…</string>
+    <string name="status_active">Active</string>
+    <string name="status_errors">Errors detected</string>
+    <string name="status_failed">Failed to start</string>
+    <string name="action_restart">Restart</string>
+    <string name="action_retry">Retry</string>
+    <string name="running_time_description">Running for %1$s</string>
+
+    <!-- Bindings -->
+    <string name="binding_ads_id">Google Ads ID</string>
+    <string name="binding_fcm">Firebase Cloud Messaging</string>
+    <string name="binding_connected">Connected</string>
+    <string name="binding_error">Error</string>
+    <string name="binding_connecting">Connecting</string>
+    <string name="binding_error_not_found">Service not found or access denied</string>
+
+    <!-- Message cards & alerts -->
+    <string name="msg_all_ok_title">All service bindings operational</string>
+
+    <string name="msg_power_title">Configure power management</string>
+    <string name="msg_power_body">Set power management settings to “Unrestricted” and enable Autostart permissions to ensure background activity.</string>
+    <string name="action_battery_settings">Battery settings</string>
+    <string name="action_autostart">Autostart</string>
+
+    <string name="msg_notifications_title">Notifications are turned off</string>
+    <string name="msg_notifications_body">Allow notifications to see the service status and get alerted when errors occur.</string>
+    <string name="action_allow">Allow</string>
+
+    <string name="msg_freeze_title">Background activity restrictions detected</string>
+    <string name="msg_freeze_body">The system has frozen the process in the background (for %1$s). Check power management settings.</string>
+    <string name="alert_freeze_body">The system had frozen the process during runtime. Check power management settings.</string>
+
+    <string name="msg_gms_title">Google Play Services not found or enabled</string>
+    <string name="msg_gms_body">Ensure Google Play Services are installed and enabled in system settings.</string>
+
+    <string name="msg_bind_all_failed_title">Unable to bind to services</string>
+    <string name="msg_bind_some_failed_title">Some services failed to bind</string>
+    <string name="msg_bind_impact">Effectiveness may be impacted.</string>
+
+    <string name="msg_start_failed_title">Unable to start foreground service</string>
+
+    <string name="msg_not_created_title">Service bindings were not created</string>
+    <string name="msg_not_created_body">The app’s background process failed to start.</string>
+
+    <!-- Notification channels -->
+    <string name="channel_status_name">Service status</string>
+    <string name="channel_status_description">Ongoing notification shown while the background service is running.</string>
+    <string name="channel_alerts_name">Errors and warnings</string>
+    <string name="channel_alerts_description">Alerts about service errors, binding failures and background restrictions.</string>
 </resources>

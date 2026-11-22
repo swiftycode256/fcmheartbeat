@@ -2,3 +2,10 @@
 *.sw?
 .gradle/
 .idea/
+.kotlin/
+/build
+local.properties
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/

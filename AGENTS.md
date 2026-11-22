@@ -166,9 +166,12 @@ Do **not** count ticks: `delay(1000)` overshoots by a few ms per tick, which add
   - `kotlinx-coroutines-android` 1.10.2, which works with the 2.2 compiler
 - **Bumped:** `core-ktx` 1.19.1, `activity-compose` 1.13.0, `lifecycle` 2.11.1, `androidx.test.ext:junit` 1.3.0, `espresso-core` 3.7.0.
 
-## Open questions (need the HyperOS device)
+## Device findings (HyperOS, confirmed by the user)
 
-- **GMS process layout:** run `adb shell ps -A | grep com.google.android.gms`. If a `com.google.android.gms.persistent` process exists, check where GCM lives with `adb shell dumpsys activity services com.google.android.gms/.gcm.GcmService | grep app=`. If GCM is in `.persistent`, the FCM binding needs a service that also runs there.
-- **"Unrestricted" mapping:** does HyperOS's per-app "No restrictions" battery setting make `isIgnoringBatteryOptimizations()` return true? The emulator can't answer this. If not, the power-management card will stay visible after the user changes the setting.
+- **GMS process layout:** the device runs GCM in the main `com.google.android.gms` process (no `.persistent` process), the same as the emulator. Both bindings therefore elevate the FCM connection process.
+- **"Unrestricted" mapping:** HyperOS's per-app "Unrestricted" battery setting does update Android's battery-optimization allowlist. This was checked with the hidden AOSP permission page, and other apps (e.g. Microsoft Authenticator) detect it, so `isIgnoringBatteryOptimizations()` is a reliable signal.
+
+## Remaining notes
+
 - **`applicationId`** is still `com.example.fcmheartbeat`. Change it before any release.
 - **Distribution:** `USE_EXACT_ALARM` and `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` are restricted under Google Play policy. Both are fine for sideloading or GitHub releases. If the app is ever published on Play, revisit them.
