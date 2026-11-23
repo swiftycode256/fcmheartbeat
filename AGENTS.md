@@ -323,6 +323,171 @@ Do **not** count ticks: `delay(1000)` overshoots by a few ms per tick, which add
     - Caveat: the phone was charging from 18:02:31 to 18:16:51 (GMS exempt), so only ~1 min of unplugged screen-off was observed.
   - **Diagnose with:** `adb shell dumpsys greezer | grep -E "uid = 10122|uid=10122"` alongside the GcmService dump.
 
+## ColorOS 17 CN findings (OTA analysis, not yet tested on a device)
+
+Source: OnePlus PYB110 full OTA `PYB110_17.0.1.201(CN01)` (Android 17, ColorOS V17.0.0, analyzed 2026-11-23). "Confirmed" means read in code or config. "Inferred" means a conclusion that wasn't traced end to end. Nothing here has been checked on a phone yet.
+
+- **Components:**
+  - **Hans** ("OFreezer 3.0") freezes apps. It lives in `oplus-services.jar` (`com.android.server.hans.*`, `com.android.server.am.OplusHansManager`) with the native daemon `/system_ext/bin/hans` (cgroup v2 freezer).
+    - Its config is `sys_elsa_config_list.xml`. A copy ships in the Athena APK assets and is installed as `/data/oplus/os/bpm/sys_elsa_config_list.xml`, updatable by RUS (Oplus's cloud config).
+  - **Athena** (`com.oplus.athena`, `system_ext/app/Athena`) kills apps: swipe-up, one-key and memory clears.
+  - **Battery** (`com.oplus.battery`) holds the per-app battery settings, the Google reachability check and "Sleep standby optimization".
+  - **OGuard** (`com.android.server.hans.oguard`) handles abnormal power use.
+  - **Startup manager** (`OplusAppStartupManager`) controls autostart.
+  - **Doze, SmartDoze and alarm alignment** live in `oplus-service-jobscheduler.jar`.
+- **Extraction:** the same approach as the HyperOS OTA, run straight from the zip. A lazy `payload.bin` reader handled the full-OTA ops (XZ/BZ2/replace). An EROFS reader covered the images, which use LZ4 + big pcluster + 0-padding, with no tail-packing or fragments. `dexdump -d` disassembled the code.
+
+### Google restricted mode (`Settings.Secure google_restric_info`)
+
+This is the switch everything GMS-specific depends on. It plays the role of the HyperOS China GMS limit, but goes further.
+
+- **Writer:** Battery `GoogleRestrictionController` (confirmed). It writes 0 when it starts.
+- **When it re-checks:**
+  - at boot (+5 s)
+  - on connectivity changes (+1 s; if the network MCC is not 460, it un-restricts immediately)
+  - when the default network becomes validated, while restricted
+  - when packages in `google_restriction_list` change
+  - when System `customize_control_cn_gms` (the CN "Google services" switch) changes
+  - when the cloud list changes
+  - **There is no periodic re-check.**
+- **Decision (`NetworkDetector`):**
+  - On mobile data, it reports "reachable" without probing if the SIM's IMSI isn't 460, **any VPN is active**, or the network MCC isn't Chinese. Otherwise it uses a per-SIM cache (`oplus_google_mobile_probe_cache`; a cached failure fails immediately) or probes.
+  - On Wi-Fi, a non-Chinese MCC also means "reachable". Otherwise it probes. **Wi-Fi has no VPN shortcut.**
+  - The probe is `GET https://www.google.com/generate_204` then `http://www.google.com/gen_204` (3 s connect timeout, needs a 204). It tries 3 times, 15 s apart, then sets restricted=1.
+  - It only probes if GMS is enabled, `customize_control_cn_gms==1`, a network is connected and a Google package is installed. Otherwise restricted means "a Google app is installed".
+- **Effects of 1 (confirmed):**
+  - **Network:** `OplusNetworkingControlManager.setUidPolicy(uid, 4)` (reject all networks) for GMS, Play Store and configupdater. Packages flagged in Global `oplus_user_change_gms_network_control` are skipped; who writes that flag is unknown.
+  - **Hans freezing:** Hans adds GMS, GSF and Play Store to its frozen set as ordinary third-party apps (`HansSceneManager.updateGmsRestrictPkg`). A config `<prevent scene="110" pkg="com.google.android.gms" mask="1111111110"/>` applies with the screen on and off:
+    - On freeze, sockets are closed and a firewall deny is applied (`isNetBlackList` → `nwPowerSetFirewall`).
+    - Alarms, sync, jobs, broadcasts, providers, binds, service starts and async binder calls no longer wake it (`HansL7Restriction` bits 512/128/…).
+  - **Wakeups:** foreground-app wakeups into GMS are blocked (`restrictFgAssWakeupForGmsApp`). GMS partial wake locks can be refused (`OplusProxyWakeLock.acquireWLFilterGms`). GMS wakeup alarms become non-wakeup (`OplusGoogleAlarmRestrict`).
+- **Effect of 0:** Hans doesn't freeze GMS at all; it's removed from the frozen set.
+- **Readability:** the key isn't declared in the framework's `Settings.Secure`, so the Android 12+ hidden-settings read block shouldn't apply (inferred; test). The change broadcast `oplus.intent.action.google_restrict_change` needs `oplus.permission.OPLUS_COMPONENT_SAFE`, so the app can't receive it.
+- **The app can't change it.** The ROM's SettingsProvider (`mutateSecureSetting`) requires `WRITE_SECURE_SETTINGS` or the Oplus signature permission `com.oplus.permission.safe.SETTINGS` for any Secure write (confirmed). The user-grantable "Modify system settings" (`WRITE_SETTINGS`) only covers public `Settings.System` keys, so it can't touch this key, or `customize_control_cn_gms`, which would trigger a re-check.
+- **Writing the value is pointless anyway:** even with `WRITE_SECURE_SETTINGS` granted over adb, Battery rewrites it on the next check. The network block is applied separately and isn't lifted by the setting.
+
+### Hans (freezer)
+
+- **App classes** are pushed by Athena (`x/c.s`):
+  - 1: third-party
+  - 2: third-party whitelist. These are the user's "Allow background activity" apps (Battery → `RemoteGuardElfService.onBgFrozenPrefChanged` → `/data/oplus/os/bpm/bpm.xml` → `x/c.i0`) plus `whitePkg` config entries.
+  - 4: Oplus whitelist
+  - 8: GMS (`<gms>` entries)
+  - 16: system "sys-black" apps
+- **Scenes:**
+  - `LcdOn` and `LcdOff` freeze classes 1 and 4, so **class 2 isn't frozen** in normal use.
+  - `FastFreezer` targets 1, 2 and 4.
+  - `nightDeepDoze` and the deep-sleep scenes target 1, 2 and 4 when `deepSleepFreezeWhite` is set (it's `true` in the config), so **allowlisted apps are frozen too**. `nightDeepDoze` is off in the code defaults; the bundled config turns it on for 00:00–06:00.
+- **Importance (freeze exemptions), `OplusHansImportance.isHansImportantCaseLocked`.** Each scene has a bitmask:
+  - **Screen off:** traffic, audio focus/recorder, GPS, Bluetooth, default launcher/SMS/dialer, VPN, screen recorder, visible activity, preload, "extra", app card, NFC payment, uid-disnet.
+  - **Foreground service** (`fg-service` / `bound-fg-service`, proc state ≤ BFGS) is added **only on export ROMs** (`HansSceneItem.<init>`, `getLcdOffSkipImportance`). **On CN an FGS protects nothing.**
+  - **Foreground dependency** (`fg-dependency`) means the resumed app's associations, and only with the screen on. There is **no equivalent of the HyperOS virtual-display `checkBind`.**
+  - **Visible activity** counts visible windows, excluding Oplus "Mirage" cast displays.
+- **Thawing:**
+  - An alarm for a frozen app thaws it (`checkAlarmIfRestricted`) unless a prevent rule covers alarms.
+  - A sync binder call thaws it (kernel → `unfreezeForKernel` "SyncBinder").
+  - Incoming packets thaw only configured IM apps (`imPkg`: WeChat, QQ).
+  - `com.google.android.c2dm.intent.RECEIVE` broadcasts thaw any target (`cpnBroadcast type="white"`), so FCM can still reach frozen apps.
+  - Frozen apps are firewalled unless allowed network: `isAllowNet` is true for Doze-allowlisted uids and IM types.
+- **Ads ID bind:** `com.google.android.gms.ads.identifier.service.START` is on a `cpnService type="black"` list for GMS. Calls with that action don't wake a frozen GMS.
+- **Binder service `oplus_freeze` (`OplusHansFreezeManagerService`):** not usable by this app.
+  - Keep-alive, frozen-state listeners and requests need `com.oplus.permission.safe.POWER` or `APP_MANAGER`.
+  - `startBackgroundRunning` and `requestFreezeDelay` (caller's own uid only) need per-package quota info, which is only created for sys-black config apps.
+
+### Athena (kills) and the startup manager
+
+- **Swipe from recents** (`SwipeUpClearAction`, config `swipeup_forcestop_clear`):
+  - It doesn't skip apps with a foreground service, apps in the foreground, or apps locked in recents.
+  - It **skips apps with a home-screen widget**, a live wallpaper or an IME (`cc_skip_widget=true`). The widget list comes from `clear/i.B` → `SystemResState.m()` → `AthenaAmManagerInternal.getWidgetsList` → Osense `STATUS_WIDGET`, fed by `AppWidgetServiceImplExtImpl.notifyOnWidgetProviderAddedOrChangedLocked` (confirmed).
+  - Other third-party apps get stop type 2, a **force-stop** (`forceStopPackage`: stopped state; alarms cleared, inferred AOSP behavior). It becomes a plain kill if Auto launch, Allow background or a recents lock applies.
+- **Other clears** (`sys_athena_config_list.xml`):
+  - Only `ai_battery_adaptive_clear` skips FGS apps.
+  - Most memory clears skip widget, VPN, Bluetooth and audio apps.
+  - None skip anything in `abnormal_memory*` and the excessive-memory clears.
+  - After an Athena memory release, restarts of that app are refused for 5 min.
+  - Osense memory kills treat third-party FGS apps with no audio, GPS, recorder or traffic as non-perceptible, so killable.
+- **Startup manager (CN):** a dead third-party app can't be started without **Auto launch**. That covers `BOOT_COMPLETED`, `MY_PACKAGE_REPLACED`, alarm broadcasts, `START_STICKY` restarts (`getForbidRSMode()=2`) and notification-listener binds (`system[notificationListener]` → `isAllowStartFromBindService`).
+  - `APPWIDGET_ENABLED` is allowlisted; `APPWIDGET_UPDATE` isn't.
+  - The Auto launch state is in OplusSettings `startup/startup_dynamic_list.xml`. Its provider needs `OPLUS_COMPONENT_SAFE`, so **the app can't detect it**.
+- **GMS** is never force-stopped (`proc_keep`). The abnormal- and excessive-memory clears can still kill it.
+
+### Battery settings and OGuard
+
+- **Per-app background modes** (`f9/h$d`):
+
+  | Mode | Doze allowlist | OGuard `background_value` |
+  |---|---|---|
+  | 1005 Allow | added, so `isIgnoringBatteryOptimizations()` is true | 2 |
+  | 1006 Prohibit | removed | 1 |
+  | 1007 Intelligent (default) | default list restored | 0 |
+
+  - **Sideloaded (ECM-restricted) apps default to Prohibit.**
+  - The per-app page `PowerControlActivity` isn't exported; use `ACTION_APPLICATION_DETAILS_SETTINGS`.
+  - The AOSP `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` dialog only changes the AOSP allowlist, not the Oplus lists (inferred).
+- **OGuard wake-lock analysis** (`AppWakelockAnalyzer`):
+  - Thresholds: high 5 min, serious 10 min, special 20 min or ≥40% of a window of ≥30 min.
+  - For Allow apps: level 1 is a freeze or a silent wake-lock release (`proxyWakeLockForOGuard`). Level 2 is a reminder, or a **force-stop if the wake lock is held ≥1 h and ≥25% of the window**.
+  - The reminder path force-stops the app silently if it isn't among the 20 most recent tasks.
+  - Exempt: any importance ≥256 (audio, navigation, download, BLE connection, VPN, screen recording, accessibility service enabled, visible window, wallpaper, call). **A foreground service isn't exempt.**
+  - Third-party analysis is enabled by cloud config (`thirdAppConfig`). It's off in the code defaults; inferred to be on in the field.
+
+### Night, Doze and alarms
+
+- **Sleep standby optimization** (`com.oplus.deepsleep.ControllerCenter`, Secure `deepsleep_switch_state`):
+  - In the predicted sleep window, after ~20 min without motion, it cuts the network device-wide. It either turns off Wi-Fi and mobile data, or uses a netd mode where only whitelisted pids keep network.
+  - The whitelist is fixed: SOS, `com.heytap.mcs`, Find My Phone, the network stack, plus WeChat/QQ/WeCom/DingTalk when the IM switch is on. **GMS can't be added**, and it's killed at the next screen-on after the netd mode.
+  - With the switch off, the per-uid cut through Hans's night state only affects frozen apps, so it shouldn't touch GMS in normal mode (inferred).
+- **Doze:** the CN Oplus list (`my_region/etc/battery/sys_deviceidle_whitelist.xml`) replaces the `system_ext` one and omits GMS. GMS is still on the AOSP allowlist through `google.xml` `allow-in-power-save` (inferred).
+- **Alarms:** exact alarms aren't aligned except in the deep-sleep network-cut state. GMS is on `AlignWhiteArray`.
+- **Weak-signal firewall** (`OplusHansConnectivityManager`, chain 9): with the screen off on cellular, it denies Doze-allowlisted third-party and GMS uids. Whether config enables it is unknown.
+
+### Compared with HyperOS
+
+| | HyperOS 4 CN | ColorOS 17 CN |
+|---|---|---|
+| When GMS is frozen | every screen-off (`SYSTEM_BLACK_LIST`), plus the China GMS limit | only while `google_restric_info=1` |
+| Google reachability | PowerKeeper `GmsObserver`; only triggers an extra limit | Battery decides, and also blocks GMS's network |
+| Exemption the app can give GMS | bound client owning a virtual display (`checkBind`) | none |
+| The app's own FGS | safe with "No restrictions" | needs Allow background; FGS isn't an exemption on CN |
+| Swipe from recents | process kill, restart via `onCreate` | force-stop unless Auto launch, Allow background, recents lock or a widget |
+
+### Methods for the app (evaluated, not implemented)
+
+- **Recommended:**
+  - **Detect restricted mode:** read `google_restric_info` and watch it with a `ContentObserver`. When it's 1, show "Errors detected" with guidance:
+    - on mobile data, any active VPN makes ColorOS treat Google as reachable
+    - on Wi-Fi, `generate_204` must be reachable for the Battery app, so a VPN must route system apps
+    - switching networks forces a re-check
+  - **Home-screen widget** (`AppWidgetProvider`, e.g. status + running time + restart button):
+    - Athena then skips the app on swipe-up and in most memory clears (confirmed in config and code).
+    - Placement is detectable with `AppWidgetManager.getAppWidgetIds`.
+    - A tap can restart the service through a `PendingIntent` (user interaction exempts the FGS start).
+    - It doesn't affect Hans or OGuard.
+  - **ColorOS power card:**
+    - Allow background activity (detectable through `isIgnoringBatteryOptimizations()`)
+    - Allow auto launch (text only)
+    - lock in recents
+    - widget placed (detectable)
+    - The button opens `ACTION_APPLICATION_DETAILS_SETTINGS`. The current HyperOS SecurityCenter button doesn't resolve here.
+  - **Wake lock off (or optional) on ColorOS**, because of OGuard. Freeze detection then has to measure gaps in `uptimeMillis` so normal device sleep isn't counted as a freeze.
+  - **Warn about Sleep standby optimization** by reading `deepsleep_switch_state` (value meaning unverified).
+  - **Run the virtual-display helper only on HyperOS.** The ping loop is harmless but proves nothing on ColorOS.
+  - **Keep the GMS bindings.** They're free and keep GMS at FGS proc state, which Osense memory kills skip (inferred).
+- **Optional:**
+  - **An inert accessibility service** only exempts the wake lock from OGuard. Hans counts accessibility only with the screen on, and sideloaded apps need "restricted settings" allowed first.
+  - **An end-to-end FCM probe** (own Firebase project sending periodic high-priority messages) would measure real delivery, but needs a backend.
+- **Rejected:**
+  - `VpnService`: conflicts with the user's proxy VPN and would fake reachability.
+  - `NotificationListenerService`: system rebinds still need Auto launch.
+  - Hans binder APIs: need permissions or a sys-black quota.
+  - Silent audio, GPS or BLE keepalives: battery cost, and OGuard checks for abnormal audio (`isValidAudio`).
+  - An activity on the app's virtual display to earn "visible activity": untested; the display probably turns off with the screen (inferred).
+- **Device checks:**
+  - `adb shell settings get secure google_restric_info`
+  - `adb shell settings get secure deepsleep_switch_state`
+  - `adb shell dumpsys deviceidle whitelist`
+  - the GcmService dump above
+
 ## Remaining notes
 
 - **`applicationId`** is still `com.example.fcmheartbeat`. Change it before any release.
