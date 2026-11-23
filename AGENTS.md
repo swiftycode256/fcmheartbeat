@@ -64,6 +64,11 @@ A single process-wide state holder (`HeartbeatState`, a `StateFlow`) is the sour
   - `onTaskRemoved()`: schedule an exact alarm about 1 s out (`setExactAndAllowWhileIdle`) that fires a `RestartReceiver` broadcast; the receiver calls `startForegroundService`. A broadcast from an exact alarm is exempt from the Android 12+ background-start restriction.
     - Permissions: `USE_EXACT_ALARM` (API 33+, granted automatically) plus `SCHEDULE_EXACT_ALARM` with `maxSdkVersion="32"`.
     - Check `canScheduleExactAlarms()` first. If it returns false, fall back to `setAndAllowWhileIdle`, which is best-effort only.
+- **HyperOS swipe-kill restart never calls `onStartCommand`** (reproduced 2026-11-22 on OS4.0.4.0):
+  - Swiping the app away triggers `ProcessSceneCleaner: SwipeUpClean`, which kills the process. AMS then logs "restart of crashed service" and recreates the service in a new process: `onCreate` runs, but no start is delivered (`lastStartId` stays the same).
+  - A plain process kill (`run-as … kill -9`) restarts normally, with `onStartCommand(null)`.
+  - The service therefore runs `promoteToForeground()` + `initialize()` from **`onCreate`**. `onStartCommand` still calls `startForeground` (required for each `startForegroundService`) and only retries when already running.
+  - Before this fix, the restarted service stayed foreground with a stale "Active" notification but held no wake lock, bindings or virtual display. GMS was then frozen at the next screen-off.
 - **Restarting from the background only works if the app is exempt from battery optimization** ("Unrestricted"). Otherwise a sticky or alarm restart can throw `ForegroundServiceStartNotAllowedException`. Catch it and post the "Unable to start foreground service" notification.
 - Restart is best-effort. If HyperOS *force-stops* the app on swipe (as opposed to killing the process), Android cancels its alarms and stops delivering its broadcasts until the user opens it again, and nothing can bring it back. Locking the task in the switcher is the mitigation (see README).
 
@@ -99,7 +104,10 @@ A single process-wide state holder (`HeartbeatState`, a `StateFlow`) is the sour
   - On failure (`pingBinder()` false or timeout), that binding becomes `Error("Service not responding …")`. The status stays Active, with the "Some services failed to bind" warning and alert.
   - The next successful ping sets it back to Connected, which clears the warning and cancels the alert.
   - Pings that take more than 200 ms are logged under the `GmsBindingManager` tag.
-  - **Status: does not keep FCM connected on HyperOS 4 CN.** Greezer re-freezes 5 s after each thaw regardless of pings, often with network restrictions. Pings never fail, so they also can't detect the freeze. See the Greezer device finding below.
+  - **Status: does not keep FCM connected on HyperOS 4 CN on its own.** Greezer re-freezes 5 s after each thaw regardless of pings, often with network restrictions. Pings never fail, so they also can't detect the freeze.
+    - The virtual-display shield (see Helpers) is what prevents the freezes.
+    - The ping loop is kept so it can undo a China GMS-limit quick freeze, which doesn't cut the network.
+    - See the Greezer device finding below.
 
 ## Helpers (virtual-display shield)
 
@@ -284,7 +292,13 @@ Do **not** count ticks: `delay(1000)` overshoots by a few ms per tick, which add
       - Only 1 ended in an actual quick freeze (21:15, launcher on top). Twice GMS was already frozen, and in the other 5 cases path 1 froze it within 0.5–4 s.
       - At 18:53 and 19:06, the GMS diagnostics activity was the last resumed activity, so GMS counted as foreground.
       - At 18:08 (charging, FCMHeartbeat opened at 18:04:47), no freeze followed. This is consistent with the "top app holds a connection" exemption but unconfirmed, since logcat didn't cover it.
-  - **Virtual-display shield (verified in code, not yet tested on device):**
+  - **Virtual-display shield, device test (2026-11-22 22:45–22:50; unplugged, screen off ~4.7 min, after a swipe-kill restart):**
+    - Greezer tried to freeze GMS with `screen_off` 56 times (about every 5 s). Every attempt was refused: `freezeUid uid=10122 return:freeze_able|VIRTUAL_DISPLAY_APP com.example.fcmheartbeat calling` → `ActionExecute: freezeUid FAILED … reason=screen_off`.
+    - Greezer's history shows **no GMS freeze at all** in the window.
+    - The China GMS limit triggered twice (22:46:20, 22:49:25), but no quick freeze followed.
+    - FCM stayed connected the whole time: no `Close err:20`, connected since ~22:31. A push for `com.tangem.wallet` arrived at 22:46:18 with the screen off.
+    - **Still to confirm:** a long run (overnight) covering deep Doze and multiple FCM heartbeat intervals (~9–29 min).
+  - **Virtual-display shield (code analysis):**
     - Every network-cutting freeze of GMS goes through `GreezeManagerService.freezeUids`, which unconditionally calls `checkBind(GMS)`.
       - This covers path 1's initial `screen_off`/`tobg` freeze and the `from system` re-freeze after a thaw: `PolicyMaker.isAllowFreeze` → `ActionExecute.freezeUid`/`handleDelayedFreeze` → `GreezeManagerInternal.freezeUids`.
     - `checkBind` sees every app binding: `ActiveServices.bindServiceLocked` → `ActivityManagerServiceImpl.addConnection`.

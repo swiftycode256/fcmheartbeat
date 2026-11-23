@@ -43,6 +43,7 @@ class HeartbeatService : LifecycleService() {
 
     override fun onCreate() {
         super.onCreate()
+        Log.i(TAG, "onCreate pid=${android.os.Process.myPid()}")
         bindings = GmsBindingManager(this, lifecycleScope)
         shield = VirtualDisplayShield(this)
         // Keep the ongoing notification title in sync with the overall status.
@@ -51,10 +52,15 @@ class HeartbeatService : LifecycleService() {
                 if (running) Notifications.updateStatus(this@HeartbeatService, status)
             }
         }
+        // HyperOS's swipe-kill restart (SwipeUpClean → "restart of crashed service") recreates the
+        // service but never delivers onStartCommand, which left it foreground but doing nothing.
+        // Start from here as well; a later onStartCommand then only retries.
+        if (promoteToForeground()) initialize()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
+        Log.i(TAG, "onStartCommand action=${intent?.action} startId=$startId running=$running")
         // Every startForegroundService() call must be answered with startForeground(), even when
         // the service is already running, or the system crashes the app.
         if (!promoteToForeground()) return START_NOT_STICKY
@@ -95,6 +101,7 @@ class HeartbeatService : LifecycleService() {
     }
 
     private fun initialize() {
+        Log.i(TAG, "initialize: acquiring wake lock")
         try {
             acquireWakeLock()
         } catch (e: Exception) {
@@ -111,9 +118,11 @@ class HeartbeatService : LifecycleService() {
             )
         }
         runJobs = listOf(startTicker(startElapsed), startRetryLoop(), startPingLoop())
+        Log.i(TAG, "initialize: wake lock held, starting helpers")
         shield.start()
         bindings.refresh()
         Notifications.updateStatus(this, HeartbeatRepository.state.value.status)
+        Log.i(TAG, "initialize: done, status=${HeartbeatRepository.state.value.status}")
     }
 
     @SuppressLint("WakelockTimeout") // Held for the lifetime of the service by design.
