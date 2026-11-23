@@ -13,6 +13,14 @@ enum class GmsService(@param:StringRes val label: Int, val action: String) {
     Fcm(R.string.binding_fcm, "com.google.android.c2dm.intent.REGISTER"),
 }
 
+/**
+ * Helpers that make HyperOS's freezer (Greezer) skip GMS. See AGENTS.md "Virtual-display shield".
+ * Their state reuses [BindingState] (Connecting = starting, Connected = active).
+ */
+enum class Helper(@param:StringRes val label: Int) {
+    VirtualDisplay(R.string.helper_virtual_display),
+}
+
 sealed interface BindingState {
     data object Connecting : BindingState
     data object Connected : BindingState
@@ -24,6 +32,13 @@ enum class Phase { Idle, Running, Failed }
 
 /** What the user sees as the overall status (UI status card + service notification title). */
 enum class Status { Starting, Active, ErrorsDetected, FailedToStart }
+
+/** Aggregate health of the helpers, used for the summary card and the helper alert. */
+sealed interface HelperSummary {
+    data object Pending : HelperSummary
+    data object AllOk : HelperSummary
+    data class Failed(val errors: List<Pair<Helper, String>>) : HelperSummary
+}
 
 /** Aggregate health of the bindings, used for the summary card and the binding alert. */
 sealed interface BindingSummary {
@@ -41,6 +56,8 @@ data class HeartbeatState(
     val gmsAvailable: Boolean? = null,
     /** Empty when bindings were not created (service not running, or GMS unavailable). */
     val bindings: Map<GmsService, BindingState> = emptyMap(),
+    /** Empty when helpers were not started (service not running). */
+    val helpers: Map<Helper, BindingState> = emptyMap(),
     /** True once any binding reached Connected or Error since the service started. */
     val bindingsSettled: Boolean = false,
     /** Wall-clock start of the current service run; part of the freeze alert's de-dup key. */
@@ -56,6 +73,8 @@ data class HeartbeatState(
             Phase.Failed -> Status.FailedToStart
             Phase.Running -> when {
                 gmsAvailable == false -> Status.ErrorsDetected
+                // Without any working helper GMS is frozen at screen-off, whatever the bindings say.
+                helpers.isNotEmpty() && helpers.values.all { it is BindingState.Error } -> Status.ErrorsDetected
                 bindings.values.any { it is BindingState.Connected } -> Status.Active
                 bindings.values.any { it is BindingState.Error } -> Status.ErrorsDetected
                 !bindingsSettled -> Status.Starting
@@ -75,6 +94,19 @@ data class HeartbeatState(
                 errors.isEmpty() -> BindingSummary.Pending
                 errors.size == bindings.size -> BindingSummary.AllFailed(errors)
                 else -> BindingSummary.SomeFailed(errors)
+            }
+        }
+
+    val helperSummary: HelperSummary
+        get() {
+            if (helpers.isEmpty()) return HelperSummary.Pending
+            val errors = Helper.entries.mapNotNull { h ->
+                (helpers[h] as? BindingState.Error)?.let { h to it.message }
+            }
+            return when {
+                errors.isNotEmpty() -> HelperSummary.Failed(errors)
+                helpers.values.all { it is BindingState.Connected } -> HelperSummary.AllOk
+                else -> HelperSummary.Pending
             }
         }
 

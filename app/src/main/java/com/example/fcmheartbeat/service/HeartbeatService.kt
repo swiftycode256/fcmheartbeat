@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 class HeartbeatService : LifecycleService() {
 
     private lateinit var bindings: GmsBindingManager
+    private lateinit var shield: VirtualDisplayShield
     private var wakeLock: PowerManager.WakeLock? = null
     private var runJobs: List<Job> = emptyList()
     private val running get() = runJobs.isNotEmpty()
@@ -43,6 +44,7 @@ class HeartbeatService : LifecycleService() {
     override fun onCreate() {
         super.onCreate()
         bindings = GmsBindingManager(this, lifecycleScope)
+        shield = VirtualDisplayShield(this)
         // Keep the ongoing notification title in sync with the overall status.
         lifecycleScope.launch {
             HeartbeatRepository.state.map { it.status }.distinctUntilChanged().collect { status ->
@@ -63,7 +65,10 @@ class HeartbeatService : LifecycleService() {
                 initialize()
             }
             !running -> initialize() // First start, or a START_STICKY restart (null intent).
-            else -> bindings.refresh() // Already running: retry failed bindings right away.
+            else -> { // Already running: retry failed bindings/helpers right away.
+                bindings.refresh()
+                shield.start()
+            }
         }
         return if (running) START_STICKY else START_NOT_STICKY
     }
@@ -106,6 +111,7 @@ class HeartbeatService : LifecycleService() {
             )
         }
         runJobs = listOf(startTicker(startElapsed), startRetryLoop(), startPingLoop())
+        shield.start()
         bindings.refresh()
         Notifications.updateStatus(this, HeartbeatRepository.state.value.status)
     }
@@ -154,6 +160,7 @@ class HeartbeatService : LifecycleService() {
         while (isActive) {
             delay(RETRY_MILLIS)
             if (bindings.needsRetry) bindings.refresh()
+            if (shield.needsRetry) shield.start()
         }
     }
 
@@ -161,6 +168,7 @@ class HeartbeatService : LifecycleService() {
         runJobs.forEach { it.cancel() }
         runJobs = emptyList()
         bindings.unbindAll()
+        shield.release()
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
     }

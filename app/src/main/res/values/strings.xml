@@ -8,6 +8,7 @@
     <!-- Sections -->
     <string name="section_status">Status</string>
     <string name="section_bindings">Service bindings</string>
+    <string name="section_helpers">Helper processes</string>
 
     <!-- Status -->
     <string name="status_starting">Starting…</string>
@@ -27,6 +28,11 @@
     <string name="binding_error_not_found">Service not found or access denied</string>
     <string name="binding_error_ping_failed">Service not responding (ping failed)</string>
     <string name="binding_error_ping_timeout">Service not responding (no reply within %1$d s)</string>
+
+    <!-- Helpers -->
+    <string name="helper_virtual_display">Virtual display</string>
+    <string name="helper_active">Active</string>
+    <string name="helper_error_vd_stopped">Virtual display was stopped by the system</string>
 
     <!-- Message cards & alerts -->
     <string name="msg_all_ok_title">All service bindings operational</string>
@@ -52,6 +58,10 @@
     <string name="msg_bind_impact">Effectiveness may be impacted.</string>
 
     <string name="msg_start_failed_title">Unable to start foreground service</string>
+
+    <string name="msg_helpers_ok_title">All helper processes operational</string>
+    <string name="msg_helpers_failed_title">Unable to start helper processes</string>
+    <string name="msg_helpers_not_started_title">Helper processes not started</string>
 
     <string name="msg_not_created_title">Service bindings were not created</string>
     <string name="msg_not_created_body">The app’s background process failed to start.</string>

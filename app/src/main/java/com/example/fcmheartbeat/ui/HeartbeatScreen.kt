@@ -40,6 +40,8 @@ import com.example.fcmheartbeat.core.BindingState
 import com.example.fcmheartbeat.core.BindingSummary
 import com.example.fcmheartbeat.core.GmsService
 import com.example.fcmheartbeat.core.HeartbeatState
+import com.example.fcmheartbeat.core.Helper
+import com.example.fcmheartbeat.core.HelperSummary
 import com.example.fcmheartbeat.core.Phase
 import com.example.fcmheartbeat.core.PowerChecks
 import com.example.fcmheartbeat.core.Status
@@ -213,6 +215,32 @@ private fun HeartbeatContent(
                 }
             }
         }
+
+        SectionHeader(stringResource(R.string.section_helpers), Modifier.padding(top = 20.dp))
+        if (state.phase == Phase.Failed) {
+            MessageCard(
+                tone = Tone.Info,
+                title = stringResource(R.string.msg_helpers_not_started_title),
+                body = stringResource(R.string.msg_not_created_body),
+            )
+        } else {
+            BindingsList(
+                Helper.entries.map { h -> stringResource(h.label) to (state.helpers[h] ?: BindingState.Connecting) },
+                connectedLabel = R.string.helper_active,
+            )
+            val summary = if (state.phase == Phase.Running) state.helperSummary else HelperSummary.Pending
+            Revealed(summary is HelperSummary.AllOk) {
+                MessageCard(tone = Tone.Success, title = stringResource(R.string.msg_helpers_ok_title))
+            }
+            Revealed(summary is HelperSummary.Failed) {
+                val errors = (summary as? HelperSummary.Failed)?.errors.orEmpty()
+                MessageCard(
+                    tone = Tone.Error,
+                    title = stringResource(R.string.msg_helpers_failed_title),
+                    body = errors.map { (h, message) -> stringResource(h.label) + ": " + message }.joinToString("\n"),
+                )
+            }
+        }
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -260,6 +288,7 @@ private val previewActive = HeartbeatState(
     gmsAvailable = true,
     bindings = mapOf(GmsService.AdsId to BindingState.Connected, GmsService.Fcm to BindingState.Connected),
     bindingsSettled = true,
+    helpers = mapOf(Helper.VirtualDisplay to BindingState.Connected),
     runningMillis = 7_427_000,
 )
 

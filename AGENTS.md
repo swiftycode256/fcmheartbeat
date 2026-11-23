@@ -101,6 +101,20 @@ A single process-wide state holder (`HeartbeatState`, a `StateFlow`) is the sour
   - Pings that take more than 200 ms are logged under the `GmsBindingManager` tag.
   - **Status: does not keep FCM connected on HyperOS 4 CN.** Greezer re-freezes 5 s after each thaw regardless of pings, often with network restrictions. Pings never fail, so they also can't detect the freeze. See the Greezer device finding below.
 
+## Helpers (virtual-display shield)
+
+- **What it does:** `service/VirtualDisplayShield` creates a private 1×1 virtual display, `createVirtualDisplay("FCMHeartbeat", 1, 1, 160, null, 0, …)`.
+  - No surface, flags 0, no permission. It is created in `initialize()` after the wake lock and released in `teardown()`.
+  - Verified on device: `dumpsys display` shows `owner com.example.fcmheartbeat (uid 10506)`, `FLAG_PRIVATE`, `state OFF`, and no status-bar cast indicator.
+- **State:** `HeartbeatState.helpers: Map<Helper, BindingState>` (`Connecting` = starting, `Connected` = active).
+  - `VirtualDisplay.Callback.onStopped` → `Error`. The 15 s retry loop and `ACTION_START` (opening the app) recreate it.
+- **Status rule:** if every helper is in `Error`, the status is "Errors detected" even when the bindings are fine, because without the shield GMS is frozen at screen-off.
+- **UI:** a "Helper processes" section after "Service bindings" (see `ui-drafts/Main UI.png`):
+  - list rows labelled "Active" / "Error" / loading
+  - "All helper processes operational" (success card) or "Unable to start helper processes" (error card) with `<label>: <message>` lines
+  - "Helper processes not started" (info) when the service failed to start
+- **Alert:** `AlertNotifier.Type.Helper` (ID 14), "Unable to start helper processes". It is de-duplicated like the binding alert and cleared once all helpers are active.
+
 ## Freeze detection & running time
 
 Do **not** count ticks: `delay(1000)` overshoots by a few ms per tick, which adds up to minutes over a day and would trigger false freeze warnings. Use gap measurement instead:

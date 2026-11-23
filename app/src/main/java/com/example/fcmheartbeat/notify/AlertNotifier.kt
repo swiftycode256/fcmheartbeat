@@ -6,6 +6,7 @@ import com.example.fcmheartbeat.R
 import com.example.fcmheartbeat.core.BindingSummary
 import com.example.fcmheartbeat.core.GmsService
 import com.example.fcmheartbeat.core.HeartbeatState
+import com.example.fcmheartbeat.core.HelperSummary
 import com.example.fcmheartbeat.core.Phase
 
 /**
@@ -23,6 +24,7 @@ object AlertNotifier {
         GmsUnavailable(11),
         Binding(12), // "Unable to bind to services" and "Some services failed to bind" share an ID.
         StartFailure(13),
+        Helper(14),
     }
 
     sealed interface Decision {
@@ -59,16 +61,28 @@ object AlertNotifier {
                 is BindingSummary.AllFailed -> Decision.Show(
                     key = "all:" + summary.errors.joinToString("|") { "${it.first}=${it.second}" },
                     title = context.getString(R.string.msg_bind_all_failed_title),
-                    text = errorLines(context, summary.errors) + "\n" +
-                        context.getString(R.string.msg_bind_impact),
+                    text = errorLines(context, summary.errors),
                 )
                 is BindingSummary.SomeFailed -> Decision.Show(
                     key = "some:" + summary.errors.joinToString("|") { "${it.first}=${it.second}" },
                     title = context.getString(R.string.msg_bind_some_failed_title),
-                    text = errorLines(context, summary.errors),
+                    text = errorLines(context, summary.errors) + "\n" +
+                        context.getString(R.string.msg_bind_impact),
                 )
                 BindingSummary.AllOk -> Decision.Clear
                 BindingSummary.Pending -> Decision.Keep
+            }
+        },
+        Type.Helper to when {
+            state.phase != Phase.Running -> Decision.Keep
+            else -> when (val summary = state.helperSummary) {
+                is HelperSummary.Failed -> Decision.Show(
+                    key = "helper:" + summary.errors.joinToString("|") { "${it.first}=${it.second}" },
+                    title = context.getString(R.string.msg_helpers_failed_title),
+                    text = summary.errors.joinToString("\n") { (h, m) -> "${context.getString(h.label)}: $m" },
+                )
+                HelperSummary.AllOk -> Decision.Clear
+                HelperSummary.Pending -> Decision.Keep
             }
         },
         // Never auto-cleared: the user should still see it after a restart. The key includes the

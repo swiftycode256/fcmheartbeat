@@ -1,6 +1,7 @@
 package com.example.fcmheartbeat.ui
 
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
@@ -236,7 +237,11 @@ fun MessageCard(
 
 /** Grouped list: rounded outer corners, tight inner corners, small gaps between rows. */
 @Composable
-fun BindingsList(rows: List<Pair<String, BindingState>>, modifier: Modifier = Modifier) {
+fun BindingsList(
+    rows: List<Pair<String, BindingState>>,
+    modifier: Modifier = Modifier,
+    @StringRes connectedLabel: Int = R.string.binding_connected,
+) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         rows.forEachIndexed { index, (label, state) ->
             val shape = RoundedCornerShape(
@@ -251,7 +256,7 @@ fun BindingsList(rows: List<Pair<String, BindingState>>, modifier: Modifier = Mo
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    BindingStateLabel(state)
+                    BindingStateLabel(state, connectedLabel)
                 }
             }
         }
@@ -259,11 +264,11 @@ fun BindingsList(rows: List<Pair<String, BindingState>>, modifier: Modifier = Mo
 }
 
 @Composable
-private fun BindingStateLabel(state: BindingState) {
+private fun BindingStateLabel(state: BindingState, @StringRes connectedLabel: Int) {
     AnimatedContent(targetState = state::class, label = "bindingState") { kind ->
         when (kind) {
             BindingState.Connected::class -> Text(
-                stringResource(R.string.binding_connected),
+                stringResource(connectedLabel),
                 style = MaterialTheme.typography.labelLarge,
                 color = FCMHeartbeatTheme.statusColors.success,
             )

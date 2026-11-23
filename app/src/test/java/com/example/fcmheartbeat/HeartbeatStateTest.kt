@@ -4,6 +4,8 @@ import com.example.fcmheartbeat.core.BindingState
 import com.example.fcmheartbeat.core.BindingSummary
 import com.example.fcmheartbeat.core.GmsService
 import com.example.fcmheartbeat.core.HeartbeatState
+import com.example.fcmheartbeat.core.Helper
+import com.example.fcmheartbeat.core.HelperSummary
 import com.example.fcmheartbeat.core.Phase
 import com.example.fcmheartbeat.core.Status
 import com.example.fcmheartbeat.ui.formatRunningTime
@@ -91,4 +93,27 @@ class HeartbeatStateTest {
         assertEquals("2m 5s", formatShortDuration(125_000))
         assertEquals("1h 1m", formatShortDuration(3_660_000))
     }
+
+    @Test
+    fun helperFailureAloneIsErrorsDetected() {
+        val state = running(BindingState.Connected, BindingState.Connected)
+            .copy(helpers = mapOf(Helper.VirtualDisplay to BindingState.Error("boom")))
+        assertEquals(Status.ErrorsDetected, state.status)
+        assertTrue(state.helperSummary is HelperSummary.Failed)
+    }
+
+    @Test
+    fun activeHelperKeepsActiveStatus() {
+        val state = running(BindingState.Connected, BindingState.Connected)
+            .copy(helpers = mapOf(Helper.VirtualDisplay to BindingState.Connected))
+        assertEquals(Status.Active, state.status)
+        assertEquals(HelperSummary.AllOk, state.helperSummary)
+    }
+
+    @Test
+    fun startingHelperIsPending() = assertEquals(
+        HelperSummary.Pending,
+        running(BindingState.Connected, BindingState.Connected)
+            .copy(helpers = mapOf(Helper.VirtualDisplay to BindingState.Connecting)).helperSummary,
+    )
 }
