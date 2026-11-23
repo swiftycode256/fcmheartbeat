@@ -30,6 +30,14 @@ The freeze mechanism is explicitly skipped by Greezer under these circumstances 
 Therefore, an app only holding a wake lock and GMS service bindings does not make it "protected"; it also needs to satisfy at least one of the conditions mentioned above for it to work, which is what FCMHeartbeat does.
 Gboard (as the current input method) was also considered as a "protected" app in HyperOS 3, but that's no longer the case in HyperOS 4 when the screen turns off, which explains why it no longer works.
 
+## Other systems (code analysis only)
+
+### ColorOS 17
+
+ColorOS only restricts the background activity of Google Play services if Google servers are unreachable through the current network. Otherwise, it doesn't apply any specific background restrictions on it.
+The only mechanism impacting its background activity is the "Sleep standby optimization" feature, which disables all network connections except for system services. Disabling it in battery settings will prevent such restrictions.
+**Therefore, FCMHeartbeat isn't necessary on ColorOS.**
+
 ## App mechanism
 
 FCMHeartbeat makes itself a "protected" app by creating a virtual display instance. The virtual display exemption applies even with the screen off on HyperOS 4.
