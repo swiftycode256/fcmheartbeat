@@ -1,10 +1,10 @@
-package com.example.fcmheartbeat.core
+package com.fcmheartbeat.core
 
 import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.core.content.ContextCompat
-import com.example.fcmheartbeat.service.HeartbeatService
+import com.fcmheartbeat.service.HeartbeatService
 
 /** Entry point for everything that needs to start or poke the heartbeat service. */
 object HeartbeatController {

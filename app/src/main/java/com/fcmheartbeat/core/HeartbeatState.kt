@@ -1,7 +1,7 @@
-package com.example.fcmheartbeat.core
+package com.fcmheartbeat.core
 
 import androidx.annotation.StringRes
-import com.example.fcmheartbeat.R
+import com.fcmheartbeat.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

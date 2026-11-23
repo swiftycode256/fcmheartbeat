@@ -1,4 +1,4 @@
-package com.example.fcmheartbeat
+package com.fcmheartbeat
 
 import android.Manifest
 import android.content.ActivityNotFoundException
@@ -26,14 +26,15 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.fcmheartbeat.core.Gms
-import com.example.fcmheartbeat.core.HeartbeatController
-import com.example.fcmheartbeat.core.HeartbeatRepository
-import com.example.fcmheartbeat.core.PowerChecks
-import com.example.fcmheartbeat.ui.DeviceChecks
-import com.example.fcmheartbeat.ui.HeartbeatActions
-import com.example.fcmheartbeat.ui.HeartbeatScreen
-import com.example.fcmheartbeat.ui.theme.FCMHeartbeatTheme
+import com.fcmheartbeat.R
+import com.fcmheartbeat.core.Gms
+import com.fcmheartbeat.core.HeartbeatController
+import com.fcmheartbeat.core.HeartbeatRepository
+import com.fcmheartbeat.core.PowerChecks
+import com.fcmheartbeat.ui.DeviceChecks
+import com.fcmheartbeat.ui.HeartbeatActions
+import com.fcmheartbeat.ui.HeartbeatScreen
+import com.fcmheartbeat.ui.theme.FCMHeartbeatTheme
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -99,7 +100,7 @@ private fun HeartbeatRoute() {
             onAllowNotifications = {
                 // Ask again while the system still allows it; after that, only Settings can grant it.
                 val canAsk = needsNotificationPermission(context) && activity != null &&
-                    activity.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
+                        activity.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
                 if (canAsk) {
                     notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                 } else {

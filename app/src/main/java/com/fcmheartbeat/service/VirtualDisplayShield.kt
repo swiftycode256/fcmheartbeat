@@ -1,4 +1,4 @@
-package com.example.fcmheartbeat.service
+package com.fcmheartbeat.service
 
 import android.content.Context
 import android.hardware.display.DisplayManager
@@ -7,11 +7,12 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.annotation.MainThread
-import com.example.fcmheartbeat.R
-import com.example.fcmheartbeat.core.BindingState
-import com.example.fcmheartbeat.core.Helper
-import com.example.fcmheartbeat.core.HeartbeatRepository
-import com.example.fcmheartbeat.core.describe
+import com.fcmheartbeat.R
+import com.fcmheartbeat.core.BindingState
+import com.fcmheartbeat.core.Helper
+import com.fcmheartbeat.core.HeartbeatRepository
+import com.fcmheartbeat.core.describe
+import kotlin.collections.minus
 
 /**
  * Owns a tiny private virtual display so HyperOS's freezer skips GMS.

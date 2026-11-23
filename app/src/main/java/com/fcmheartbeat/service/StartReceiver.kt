@@ -1,9 +1,9 @@
-package com.example.fcmheartbeat.service
+package com.fcmheartbeat.service
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.example.fcmheartbeat.core.HeartbeatController
+import com.fcmheartbeat.core.HeartbeatController
 
 /** Starts the heartbeat service on boot, after an app update, and from the restart alarm. */
 class StartReceiver : BroadcastReceiver() {
@@ -16,6 +16,6 @@ class StartReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val ACTION_RESTART_ALARM = "com.example.fcmheartbeat.action.RESTART_ALARM"
+        const val ACTION_RESTART_ALARM = "com.fcmheartbeat.action.RESTART_ALARM"
     }
 }

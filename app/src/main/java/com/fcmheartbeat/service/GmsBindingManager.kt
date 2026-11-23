@@ -1,4 +1,4 @@
-package com.example.fcmheartbeat.service
+package com.fcmheartbeat.service
 
 import android.content.ComponentName
 import android.content.Context
@@ -8,13 +8,13 @@ import android.os.IBinder
 import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.MainThread
-import com.example.fcmheartbeat.R
-import com.example.fcmheartbeat.core.BindingState
-import com.example.fcmheartbeat.core.GMS_PACKAGE
-import com.example.fcmheartbeat.core.Gms
-import com.example.fcmheartbeat.core.GmsService
-import com.example.fcmheartbeat.core.HeartbeatRepository
-import com.example.fcmheartbeat.core.describe
+import com.fcmheartbeat.R
+import com.fcmheartbeat.core.BindingState
+import com.fcmheartbeat.core.GMS_PACKAGE
+import com.fcmheartbeat.core.Gms
+import com.fcmheartbeat.core.GmsService
+import com.fcmheartbeat.core.HeartbeatRepository
+import com.fcmheartbeat.core.describe
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

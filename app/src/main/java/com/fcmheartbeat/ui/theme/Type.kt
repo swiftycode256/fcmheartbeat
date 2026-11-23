@@ -1,4 +1,4 @@
-package com.example.fcmheartbeat.ui.theme
+package com.fcmheartbeat.ui.theme
 
 import androidx.compose.material3.Typography
 

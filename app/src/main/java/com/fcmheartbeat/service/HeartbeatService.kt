@@ -1,4 +1,4 @@
-package com.example.fcmheartbeat.service
+package com.fcmheartbeat.service
 
 import android.annotation.SuppressLint
 import android.app.AlarmManager
@@ -8,17 +8,18 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.PowerManager
+import android.os.Process
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
-import com.example.fcmheartbeat.core.HeartbeatRepository
-import com.example.fcmheartbeat.core.HeartbeatState
-import com.example.fcmheartbeat.core.Phase
-import com.example.fcmheartbeat.core.Status
-import com.example.fcmheartbeat.core.describe
-import com.example.fcmheartbeat.notify.Notifications
+import com.fcmheartbeat.core.HeartbeatRepository
+import com.fcmheartbeat.core.HeartbeatState
+import com.fcmheartbeat.core.Phase
+import com.fcmheartbeat.core.Status
+import com.fcmheartbeat.core.describe
+import com.fcmheartbeat.notify.Notifications
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -43,7 +44,7 @@ class HeartbeatService : LifecycleService() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.i(TAG, "onCreate pid=${android.os.Process.myPid()}")
+        Log.i(TAG, "onCreate pid=${Process.myPid()}")
         bindings = GmsBindingManager(this, lifecycleScope)
         shield = VirtualDisplayShield(this)
         // Keep the ongoing notification title in sync with the overall status.
@@ -186,7 +187,11 @@ class HeartbeatService : LifecycleService() {
         Log.e(TAG, "Unable to start foreground service", error)
         teardown()
         HeartbeatRepository.update {
-            HeartbeatState(phase = Phase.Failed, startError = error.describe(), gmsAvailable = it.gmsAvailable)
+            HeartbeatState(
+                phase = Phase.Failed,
+                startError = error.describe(),
+                gmsAvailable = it.gmsAvailable
+            )
         }
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -212,8 +217,8 @@ class HeartbeatService : LifecycleService() {
     }
 
     companion object {
-        const val ACTION_START = "com.example.fcmheartbeat.action.START"
-        const val ACTION_RESTART = "com.example.fcmheartbeat.action.RESTART"
+        const val ACTION_START = "com.fcmheartbeat.action.START"
+        const val ACTION_RESTART = "com.fcmheartbeat.action.RESTART"
 
         private const val TAG = "HeartbeatService"
         private const val WAKE_LOCK_TAG = "FCMHeartbeat::Heartbeat"

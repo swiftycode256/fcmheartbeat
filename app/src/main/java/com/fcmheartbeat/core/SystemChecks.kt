@@ -1,4 +1,4 @@
-package com.example.fcmheartbeat.core
+package com.fcmheartbeat.core
 
 import android.app.ActivityManager
 import android.content.ActivityNotFoundException

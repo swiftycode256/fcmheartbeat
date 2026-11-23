@@ -113,7 +113,7 @@ A single process-wide state holder (`HeartbeatState`, a `StateFlow`) is the sour
 
 - **What it does:** `service/VirtualDisplayShield` creates a private 1×1 virtual display, `createVirtualDisplay("FCMHeartbeat", 1, 1, 160, null, 0, …)`.
   - No surface, flags 0, no permission. It is created in `initialize()` after the wake lock and released in `teardown()`.
-  - Verified on device: `dumpsys display` shows `owner com.example.fcmheartbeat (uid 10506)`, `FLAG_PRIVATE`, `state OFF`, and no status-bar cast indicator.
+  - Verified on device: `dumpsys display` shows `owner com.fcmheartbeat (uid 10506)`, `FLAG_PRIVATE`, `state OFF`, and no status-bar cast indicator.
 - **State:** `HeartbeatState.helpers: Map<Helper, BindingState>` (`Connecting` = starting, `Connected` = active).
   - `VirtualDisplay.Callback.onStopped` → `Error`. The 15 s retry loop and `ACTION_START` (opening the app) recreate it.
 - **Status rule:** if every helper is in `Error`, the status is "Errors detected" even when the bindings are fine, because without the shield GMS is frozen at screen-off.
@@ -295,7 +295,7 @@ Do **not** count ticks: `delay(1000)` overshoots by a few ms per tick, which add
       - At 18:53 and 19:06, the GMS diagnostics activity was the last resumed activity, so GMS counted as foreground.
       - At 18:08 (charging, FCMHeartbeat opened at 18:04:47), no freeze followed. This is consistent with the "top app holds a connection" exemption but unconfirmed, since logcat didn't cover it.
   - **Virtual-display shield, device test (2026-11-22 22:45–22:50; unplugged, screen off ~4.7 min, after a swipe-kill restart):**
-    - Greezer tried to freeze GMS with `screen_off` 56 times (about every 5 s). Every attempt was refused: `freezeUid uid=10122 return:freeze_able|VIRTUAL_DISPLAY_APP com.example.fcmheartbeat calling` → `ActionExecute: freezeUid FAILED … reason=screen_off`.
+    - Greezer tried to freeze GMS with `screen_off` 56 times (about every 5 s). Every attempt was refused: `freezeUid uid=10122 return:freeze_able|VIRTUAL_DISPLAY_APP com.fcmheartbeat calling` → `ActionExecute: freezeUid FAILED … reason=screen_off`.
     - Greezer's history shows **no GMS freeze at all** in the window.
     - The China GMS limit triggered twice (22:46:20, 22:49:25), but no quick freeze followed.
     - FCM stayed connected the whole time: no `Close err:20`, connected since ~22:31. A push for `com.tangem.wallet` arrived at 22:46:18 with the screen off.
@@ -307,7 +307,7 @@ Do **not** count ticks: `delay(1000)` overshoots by a few ms per tick, which add
     - A bound client counts if `preCheckInterest(client)` matches the `VIRTUAL_DISPLAY` bit. That calls `GreezeManagerService.isUsingVirtualDisplay(uid)` → `DisplayManagerInternal.isUsingVirtualDisplay` → `VirtualDisplayAdapter.isUsingVirtualDisplayLocked`.
       - It is true if **any** virtual display has `ownerUid == uid` (or `applicationName` resolves to that uid). No flags, display state or content are required.
       - `mVirtualDisplayBlackList` only lists delivery and bike apps (Meituan, Ele.me, Easybike…).
-    - So if FCMHeartbeat (bound to GMS, never frozen itself thanks to `NO_RESTRICT_APP`) owns a private virtual display, `checkBind(GMS)` should return true. Logcat would show `freezeUid uid=10122 return:com.example.fcmheartbeat is calling`.
+    - So if FCMHeartbeat (bound to GMS, never frozen itself thanks to `NO_RESTRICT_APP`) owns a private virtual display, `checkBind(GMS)` should return true. Logcat would show `freezeUid uid=10122 return:com.fcmheartbeat is calling`.
     - **Path 2 isn't covered:** quick freeze → `freezeAction` never calls `checkBind`, and its only binding exemption needs FCMHeartbeat to be the top app. But it doesn't cut the network, and a ping thaw afterwards is only re-frozen via path 1, which the shield blocks.
   - **Provider-query thaw (checked 2026-11-22, all Greezer history 00:04–19:25, charging state from battery history):**
     - Considering only windows that were unplugged with the screen off, `provider` thaws of GMS were followed by a network-safe `quick freeze` 14/15 times. That includes 6/6 that came right after a network-cutting freeze.
@@ -490,5 +490,5 @@ This is the switch everything GMS-specific depends on. It plays the role of the 
 
 ## Remaining notes
 
-- **`applicationId`** is still `com.example.fcmheartbeat`. Change it before any release.
+- **`applicationId`** is still `com.fcmheartbeat`. Change it before any release.
 - **Distribution:** `USE_EXACT_ALARM` is restricted under Google Play policy. It is fine for sideloading or GitHub releases. If the app is ever published on Play, revisit it. (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` was dropped along with the old "Battery settings" button.)

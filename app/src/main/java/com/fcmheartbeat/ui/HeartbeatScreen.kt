@@ -1,4 +1,4 @@
-package com.example.fcmheartbeat.ui
+package com.fcmheartbeat.ui
 
 import android.content.Context
 import android.content.res.Configuration
@@ -35,17 +35,17 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.fcmheartbeat.R
-import com.example.fcmheartbeat.core.BindingState
-import com.example.fcmheartbeat.core.BindingSummary
-import com.example.fcmheartbeat.core.GmsService
-import com.example.fcmheartbeat.core.HeartbeatState
-import com.example.fcmheartbeat.core.Helper
-import com.example.fcmheartbeat.core.HelperSummary
-import com.example.fcmheartbeat.core.Phase
-import com.example.fcmheartbeat.core.PowerChecks
-import com.example.fcmheartbeat.core.Status
-import com.example.fcmheartbeat.ui.theme.FCMHeartbeatTheme
+import com.fcmheartbeat.R
+import com.fcmheartbeat.core.BindingState
+import com.fcmheartbeat.core.BindingSummary
+import com.fcmheartbeat.core.GmsService
+import com.fcmheartbeat.core.HeartbeatState
+import com.fcmheartbeat.core.Helper
+import com.fcmheartbeat.core.HelperSummary
+import com.fcmheartbeat.core.Phase
+import com.fcmheartbeat.core.PowerChecks
+import com.fcmheartbeat.core.Status
+import com.fcmheartbeat.ui.theme.FCMHeartbeatTheme
 import java.util.Locale
 
 /** Device settings the UI re-reads on every resume (no broadcasts exist for these). */
@@ -284,7 +284,10 @@ fun formatShortDuration(millis: Long): String {
 private val previewActive = HeartbeatState(
     phase = Phase.Running,
     gmsAvailable = true,
-    bindings = mapOf(GmsService.AdsId to BindingState.Connected, GmsService.Fcm to BindingState.Connected),
+    bindings = mapOf(
+        GmsService.AdsId to BindingState.Connected,
+        GmsService.Fcm to BindingState.Connected
+    ),
     bindingsSettled = true,
     helpers = mapOf(Helper.VirtualDisplay to BindingState.Connected),
     runningMillis = 7_427_000,

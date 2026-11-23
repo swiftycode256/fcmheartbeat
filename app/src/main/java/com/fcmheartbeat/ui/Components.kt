@@ -1,4 +1,4 @@
-package com.example.fcmheartbeat.ui
+package com.fcmheartbeat.ui
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
@@ -54,11 +54,11 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.fcmheartbeat.R
-import com.example.fcmheartbeat.core.BindingState
-import com.example.fcmheartbeat.core.Status
-import com.example.fcmheartbeat.notify.labelRes
-import com.example.fcmheartbeat.ui.theme.FCMHeartbeatTheme
+import com.fcmheartbeat.R
+import com.fcmheartbeat.core.BindingState
+import com.fcmheartbeat.core.Status
+import com.fcmheartbeat.notify.labelRes
+import com.fcmheartbeat.ui.theme.FCMHeartbeatTheme
 
 val CardShape = RoundedCornerShape(28.dp)
 private val SegmentOuter = 24.dp

@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.fcmheartbeat"
+    namespace = "com.fcmheartbeat"
     compileSdk {
         // Compose 1.13 / Material 3 1.5 (BOM 2026.11.01) require compileSdk 37.1.
         version = release(37) {
@@ -13,7 +13,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.fcmheartbeat"
+        applicationId = "com.fcmheartbeat"
         minSdk = 26
         targetSdk = 37
         versionCode = 1

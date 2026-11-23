@@ -24,7 +24,7 @@
     </queries>
 
     <application
-        android:name=".HeartbeatApp"
+        android:name="com.fcmheartbeat.HeartbeatApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -34,7 +34,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FCMHeartbeat">
         <activity
-            android:name=".MainActivity"
+            android:name="com.fcmheartbeat.MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/Theme.FCMHeartbeat">
@@ -46,7 +46,7 @@
         </activity>
 
         <service
-            android:name=".service.HeartbeatService"
+            android:name="com.fcmheartbeat.service.HeartbeatService"
             android:exported="false"
             android:foregroundServiceType="specialUse"
             android:stopWithTask="false">
@@ -57,7 +57,7 @@
 
         <!-- Only the system (boot / package update) and our own alarm send to this receiver. -->
         <receiver
-            android:name=".service.StartReceiver"
+            android:name="com.fcmheartbeat.service.StartReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

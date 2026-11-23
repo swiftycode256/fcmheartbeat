@@ -1,4 +1,4 @@
-package com.example.fcmheartbeat.notify
+package com.fcmheartbeat.notify
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -9,9 +9,9 @@ import android.content.Intent
 import androidx.annotation.StringRes
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.example.fcmheartbeat.MainActivity
-import com.example.fcmheartbeat.R
-import com.example.fcmheartbeat.core.Status
+import com.fcmheartbeat.MainActivity
+import com.fcmheartbeat.R
+import com.fcmheartbeat.core.Status
 
 object Notifications {
     /** Ongoing foreground service notification. */

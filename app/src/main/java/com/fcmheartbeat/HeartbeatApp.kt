@@ -1,9 +1,9 @@
-package com.example.fcmheartbeat
+package com.fcmheartbeat
 
 import android.app.Application
-import com.example.fcmheartbeat.core.HeartbeatRepository
-import com.example.fcmheartbeat.notify.AlertNotifier
-import com.example.fcmheartbeat.notify.Notifications
+import com.fcmheartbeat.core.HeartbeatRepository
+import com.fcmheartbeat.notify.AlertNotifier
+import com.fcmheartbeat.notify.Notifications
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

@@ -1,4 +1,4 @@
-package com.example.fcmheartbeat.ui.theme
+package com.fcmheartbeat.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme

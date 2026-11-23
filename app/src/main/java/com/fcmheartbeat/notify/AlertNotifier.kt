@@ -1,13 +1,14 @@
-package com.example.fcmheartbeat.notify
+package com.fcmheartbeat.notify
 
 import android.content.Context
 import androidx.core.content.edit
-import com.example.fcmheartbeat.R
-import com.example.fcmheartbeat.core.BindingSummary
-import com.example.fcmheartbeat.core.GmsService
-import com.example.fcmheartbeat.core.HeartbeatState
-import com.example.fcmheartbeat.core.HelperSummary
-import com.example.fcmheartbeat.core.Phase
+import com.fcmheartbeat.R
+import com.fcmheartbeat.core.BindingSummary
+import com.fcmheartbeat.core.GmsService
+import com.fcmheartbeat.core.HeartbeatState
+import com.fcmheartbeat.core.HelperSummary
+import com.fcmheartbeat.core.Phase
+import kotlin.collections.iterator
 
 /**
  * Turns state into error/warning notifications.

@@ -1,15 +1,15 @@
-package com.example.fcmheartbeat
+package com.fcmheartbeat
 
-import com.example.fcmheartbeat.core.BindingState
-import com.example.fcmheartbeat.core.BindingSummary
-import com.example.fcmheartbeat.core.GmsService
-import com.example.fcmheartbeat.core.HeartbeatState
-import com.example.fcmheartbeat.core.Helper
-import com.example.fcmheartbeat.core.HelperSummary
-import com.example.fcmheartbeat.core.Phase
-import com.example.fcmheartbeat.core.Status
-import com.example.fcmheartbeat.ui.formatRunningTime
-import com.example.fcmheartbeat.ui.formatShortDuration
+import com.fcmheartbeat.core.BindingState
+import com.fcmheartbeat.core.BindingSummary
+import com.fcmheartbeat.core.GmsService
+import com.fcmheartbeat.core.HeartbeatState
+import com.fcmheartbeat.core.Helper
+import com.fcmheartbeat.core.HelperSummary
+import com.fcmheartbeat.core.Phase
+import com.fcmheartbeat.core.Status
+import com.fcmheartbeat.ui.formatRunningTime
+import com.fcmheartbeat.ui.formatShortDuration
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
