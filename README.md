@@ -4,56 +4,43 @@ A simple, always-running helper tool app that stops Xiaomi HyperOS from restrict
 
 ## Technical analysis
 
-On certain Xiaomi HyperOS versions, its power management features actively restricts the background activity and network sockets of Google Play's FCM services when the screen is locked, preventing app notifications from being delivered properly. This causes the FCM process to frequently disconnect with the errors `ERR_IO_FIN` or `ERR_IO_WRITE`. On HyperOS 3, using Gboard as the input method deters the system from restricting FCM, but that's no longer the case for HyperOS 4 as more power management mechanisms are implemented.
+On certain Xiaomi HyperOS versions, its power management features actively restrict the background activity and network sockets of Google Play's FCM services when the screen is locked, preventing app notifications from being delivered properly. This causes the FCM process to frequently disconnect with the errors `ERR_IO_FIN` or `ERR_IO_WRITE`. On HyperOS 3, using Gboard as the input method deters the system from restricting FCM due to its service bindings to GMS, but that's no longer the case for HyperOS 4 with additional power management mechanisms implemented.
 
-### How HyperOS restricts FCM
+---
 
-The restrictions come from HyperOS's own process freezer, **Greezer** (`com.miui.server.greeze` in `/system_ext/framework/miui-services.jar`, inspected with `adb shell dumpsys greezer`). Android's standard power management isn't the cause: GMS is on the system Doze allowlist, its Doze network rules stay unblocked, and it remains at foreground-service priority while bound.
+The restrictions come from HyperOS's own process freezer, **Greezer**. This only applies to China ROMs, as Greezer excempts all Google apps from background restrictions on Global ROMs. 
 
-Greezer freezes GMS in two ways once the screen turns off:
+About 30 seconds after the screen turns off, Greezer freezes the GMS process with the reason `screen_off` (also `tobg` and `from system`) and closes its network sockets while blocking new connections, causing its connection to close immediately with `ERR_IO_FIN`.
+Any wake-up (e.g. a binder call, an incoming broadcast, a provider query) only unfreezes GMS for 5 seconds before it gets frozen again.
+GMS's reconnect alarm is held when it's frozen, which is why FCM often stays offline even when the screen turns back on unless a network change occurs.
 
-1. **Screen-off freeze.** About 10–30 s after the screen turns off, Greezer freezes the GMS process with reason `screen_off` (also `tobg` and `from system`). The freeze also applies network restrictions (`NET_SOCKET|NET_CHAIN`): it closes the app's sockets and blocks its network.
-   - The FCM connection dies within about 0.3 s. Every `Close err:20` (`ERR_IO_FIN`) in the FCM log lines up with one of these freezes.
-   - On China ROMs, GMS is on Greezer's system blacklist. Global ROMs remove it from that list and also exempt all Google apps; China ROMs skip both.
-   - Any wake-up (a binder call, an incoming broadcast, a provider query) only unfreezes GMS for a fixed 5 s. Greezer then freezes it again, often with the network cut again.
-   - GMS's reconnect alarm is held while it's frozen, so FCM stays offline until a network change or the screen turns on. In logs, these outages lasted from minutes to over 6 hours.
-2. **China-only "GMS limit".** On China models, about 10 s after GMS becomes active while the screen is off (in practice about once a minute), Greezer takes GMS off its allowlist and **quick-freezes** every GMS process, including dual-app and second-space copies.
-   - This freeze leaves the network alone, but GMS can't run until something unfreezes it.
-   - It's controlled by `mGmsLimitEnabled`, which is on by default. The debug command `adb shell dumpsys greezer IM GMS disable` turns it off until the next reboot.
-   - HyperOS 3 had a GMS limit too, but it only covered the dual-app/second-space copy of GMS and only restricted wake locks and network rules.
+There's also a quick-freeze mechanism on China ROMs, which Greezer freezes all GMS instances on the system 1 minute after screen lock. While it does not close its network sockets, GMS stays inactive in the background unless a service ping or other activity causes Greezer to temporarily unfreeze it.
+It's controlled by the `mGmsLimitEnabled` config value, which is on by default. The debug command `dumpsys greezer IM GMS disable` turns it off until the next reboot.
+(HyperOS 3 had this mechanism too, but it only applies to the dual-app/second-space copy of GMS and only restricted wake locks and network rules.)
 
-Bindings, wake locks and foreground services don't protect GMS on their own. Greezer ignores Android's process priority for GMS: an app bound to GMS with `BIND_IMPORTANT` from a foreground service didn't stop either freeze.
+Greezer also ignores Android's process priority: increasing the GMS process priority with a wake-lock enabled app holding GMS service bindings does not prevent Greezer from restricting FCM.
 
-### When HyperOS doesn't restrict FCM
+---
 
-Greezer skips a freeze in a few cases:
+However, Greezer does not restrict FCM's background activity if a "protected" app holds service bindings to GMS (and is not frozen by the system).
 
-- **While charging:** blacklisted system apps are exempt while plugged in (`sysblack_plugged`). That's why tests done on the charger look fine.
-- **While GMS is on screen or starting an activity**, for example with the FCM diagnostics page open.
-- **For apps set to "No restrictions"** in HyperOS's battery settings (`NO_RESTRICT_APP`). Play services doesn't offer this setting.
-- **When a protected app is bound to GMS.** This is the key one. Before freezing an app, Greezer checks every app bound to it (`checkBind`). If one of those clients counts as protected, the freeze is skipped (`… is calling`). A client counts as protected if it is the current keyboard (IME), owns a virtual display, is using the camera or vibrator, or is running a backup or instrumentation. With the screen on, being the top or a visible app counts too.
-- **On the 60 s GMS limit only:** the app currently in front holding a binding to GMS also prevents it.
+The system considers an app as "protected" if it's the current input method (screen on only), owns a virtual display instance, is using the camera/vibration, or is actively using audio or location services besides being the current app on screen.
+The freeze mechanism is explicitly skipped by Greezer under these circumstances as shown in log messages.
 
-**Why Gboard used to work:** on HyperOS 3 the keyboard check was simply "is this the current keyboard". Gboard was therefore never frozen, and because Gboard is bound to GMS (`.chimera.PersistentApiService`), GMS was skipped as well. HyperOS 4 changed the check to "current keyboard **and screen on**". Now Gboard and GMS both get frozen at every screen-off.
-
-Conversation notifications have also been seen to keep FCM alive. No code path linking them to GMS has been found yet.
+Therefore, an app only holding a wake lock and GMS service bindings does not make it "protected"; it also needs to satisfy at least one of the conditions mentioned above for it to work, which is what FCMHeartbeat does.
+Gboard (as the current input method) was also considered as a "protected" app in HyperOS 3, but that's no longer the case in HyperOS 4 when the screen turns off, which explains why it no longer works.
 
 ## App mechanism
 
-FCMHeartbeat makes itself a protected client of GMS, the role Gboard had on HyperOS 3. The virtual-display check, unlike the keyboard check, still applies with the screen off on HyperOS 4.
+FCMHeartbeat makes itself a "protected" app by creating a virtual display instance. The virtual display exemption applies even with the screen off on HyperOS 4.
 
-- **Foreground service.** When the app is opened, on boot, after an app update, or whenever the system restarts it, the app runs a `specialUse` foreground service. That service:
-  - holds a partial wake lock
-  - binds to the GMS services `com.google.android.c2dm.intent.REGISTER` (FCM registration) and `com.google.android.gms.ads.identifier.service.START` (Google Ads ID)
-  - creates a **private 1×1 virtual display** with no surface. Nothing is ever drawn, so it costs no battery, and it needs no permission. Owning it makes the app count as a protected client, so Greezer refuses the screen-off freeze of GMS. Logcat shows `VIRTUAL_DISPLAY_APP com.example.fcmheartbeat calling`.
-- **Pings.** The service pings the Ads ID binding every 4 s. If the GMS limit's quick freeze catches GMS, the next ping unfreezes it. Any later attempt to refreeze it with the network cut is blocked by the virtual display.
-- **Tested on HyperOS 4.0.4.0 (China ROM)**, unplugged with the screen off. All 56 screen-off freeze attempts on GMS were refused, FCM stayed connected, and pushes arrived. This was a short test; a longer, overnight run is still to be confirmed.
-- **Restart behavior.** The app relies on Android's sticky-service restart, and schedules an exact-alarm restart for when its task is removed.
-  - When the app is swiped away, HyperOS kills it (`SwipeUpClean`) and restarts the service without calling `onStartCommand`. The service therefore starts all of its work from `onCreate`.
-  - Restarting from the background requires the "Unrestricted" battery setting.
-- **Status display.** The app shows the service status, its running time (excluding any time the app itself was frozen), the state of each binding, and the virtual display ("Helper processes").
-  - Errors and warnings are posted on a separate notification channel.
-  - The FCM Diagnostics page can be opened from the toolbar.
+When the app is opened or on device start, the app starts a `specialUse` foreground service that holds a partial wake lock to keep it always running.
+It binds to the GMS services `com.google.android.c2dm.intent.REGISTER` (FCM registration) and `com.google.android.gms.ads.identifier.service.START` (Google Ads ID) and creates a private 1×1 virtual display with no surface.
+Nothing is ever rendered in it, so there is almost no battery life impact, and it needs no additional permissions to work.
+
+The service also pings the Google Ads ID service every 4 seconds, which causes the other quick-freeze mechanism to temporarily unfreeze it. It repeatedly unfreezes the process to make FCM stay active in the background. The quick-freeze mechanism does not close network sockets, so it won't disconnect FCM when it freezes the process again.
+
+The app is tested to work on HyperOS version `4.0.4.0.XPLCNXM.D02` running on REDMI Turbo 5 Max. Log messages show Greezer skipped the freeze mechanism when the app is running, and FCM disconnect errors didn't appear.
 
 ## Usage instructions
 
