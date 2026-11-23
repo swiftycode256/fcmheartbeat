@@ -1,6 +1,6 @@
 # FCMHeartbeat (for Xiaomi HyperOS)
 
-A simple, always-running helper tool app that stops Xiaomi HyperOS from restricting the background activity of Google Play's FCM (Cloud Messaging) services.
+A simple, always-running helper tool app that stops Xiaomi HyperOS from restricting the background activity of Google Play's FCM (Cloud Messaging) services. No root or Shizuku required; just install it on your device and it works out of the box.
 
 ## Technical analysis
 
@@ -47,4 +47,5 @@ The app is tested to work on HyperOS version `4.0.4.0.XPLCNXM.D02` running on RE
 - Enable Autostart permissions and set power management mode to "Unrestricted" for this app
 - Open the app for it to start running in the background (no additional "Start" button needed)
 - Click the diagnostics button in the toolbar to check the FCM Diagnostics page
+    - You might have to double-click the "Events" button to refresh the status properly
 - Recommended: Lock the app window in the task switcher to reduce interruptions to its background process
