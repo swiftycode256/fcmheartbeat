@@ -1,6 +1,5 @@
 package com.example.fcmheartbeat.core
 
-import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
@@ -10,6 +9,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
+import android.os.Process
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 
@@ -43,38 +43,27 @@ object PowerChecks {
     fun notificationsEnabled(context: Context): Boolean =
         NotificationManagerCompat.from(context).areNotificationsEnabled()
 
-    private val autostartIntent: Intent
-        get() = Intent().setComponent(
-            ComponentName(
-                "com.miui.securitycenter",
-                "com.miui.permcenter.autostart.AutoStartManagementActivity",
-            )
-        )
-
-    fun isAutostartPageAvailable(context: Context): Boolean =
-        context.packageManager.resolveActivity(autostartIntent, 0) != null
-
-    fun openAutostartSettings(context: Context): Boolean = launch(context, autostartIntent)
-
     /**
-     * Opens the system "let app always run in background?" prompt, falling back to the app details
-     * page (where HyperOS shows the battery saver setting).
+     * HyperOS's own app settings page (Security app), which holds the battery saver
+     * ("Unrestricted") and Autostart switches. Absent on non-Xiaomi devices.
      */
-    @SuppressLint("BatteryLife") // Sideloaded utility whose whole purpose is background execution.
-    fun openBatterySettings(context: Context) {
-        val request = Intent(
-            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-            Uri.fromParts("package", context.packageName, null),
-        )
-        if (!PowerChecks.isUnrestricted(context) && launch(context, request)) return
-        launch(context, appDetailsIntent(context))
-    }
+    private fun appSettingsIntent(context: Context) = Intent()
+        .setComponent(ComponentName(SECURITY_CENTER, "com.miui.appmanager.ApplicationsDetailsActivity"))
+        .putExtra("package_name", context.packageName)
+        .putExtra("miui.intent.extra.USER_ID", Process.myUserHandle().hashCode()) // == user id
+
+    fun isAppSettingsPageAvailable(context: Context): Boolean =
+        context.packageManager.resolveActivity(appSettingsIntent(context), 0)?.activityInfo?.exported == true
+
+    fun openAppSettings(context: Context): Boolean = launch(context, appSettingsIntent(context))
 
     fun openNotificationSettings(context: Context) {
         val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
             .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
         if (!launch(context, intent)) launch(context, appDetailsIntent(context))
     }
+
+    private const val SECURITY_CENTER = "com.miui.securitycenter"
 
     private fun appDetailsIntent(context: Context) = Intent(
         Settings.ACTION_APPLICATION_DETAILS_SETTINGS,

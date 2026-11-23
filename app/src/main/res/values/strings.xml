@@ -39,8 +39,7 @@
 
     <string name="msg_power_title">Configure power management</string>
     <string name="msg_power_body">Set power management settings to “Unrestricted” and enable Autostart permissions to ensure background activity.</string>
-    <string name="action_battery_settings">Battery settings</string>
-    <string name="action_autostart">Autostart</string>
+    <string name="action_app_settings">Open app settings</string>
 
     <string name="msg_notifications_title">Notifications are turned off</string>
     <string name="msg_notifications_body">Allow notifications to see the service status and get alerted when errors occur.</string>

@@ -52,13 +52,13 @@ import java.util.Locale
 data class DeviceChecks(
     val unrestricted: Boolean = true,
     val notificationsEnabled: Boolean = true,
-    val autostartAvailable: Boolean = false,
+    val appSettingsAvailable: Boolean = false,
 ) {
     companion object {
         fun read(context: Context) = DeviceChecks(
             unrestricted = PowerChecks.isUnrestricted(context),
             notificationsEnabled = PowerChecks.notificationsEnabled(context),
-            autostartAvailable = PowerChecks.isAutostartPageAvailable(context),
+            appSettingsAvailable = PowerChecks.isAppSettingsPageAvailable(context),
         )
     }
 }
@@ -67,8 +67,7 @@ class HeartbeatActions(
     val onRestart: () -> Unit = {},
     val onRetry: () -> Unit = {},
     val onOpenDiagnostics: () -> Unit = {},
-    val onOpenBatterySettings: () -> Unit = {},
-    val onOpenAutostart: () -> Unit = {},
+    val onOpenAppSettings: () -> Unit = {},
     val onAllowNotifications: () -> Unit = {},
 )
 
@@ -159,11 +158,10 @@ private fun HeartbeatContent(
                 tone = Tone.Info,
                 title = stringResource(R.string.msg_power_title),
                 body = stringResource(R.string.msg_power_body),
-                actions = {
-                    CardAction(stringResource(R.string.action_battery_settings), actions.onOpenBatterySettings)
-                    if (checks.autostartAvailable) {
-                        CardAction(stringResource(R.string.action_autostart), actions.onOpenAutostart)
-                    }
+                actions = if (checks.appSettingsAvailable) {
+                    { CardAction(stringResource(R.string.action_app_settings), actions.onOpenAppSettings) }
+                } else {
+                    null
                 },
             )
         }
@@ -310,7 +308,7 @@ private fun PreviewWarnings() = FCMHeartbeatTheme(dynamicColor = false) {
             ),
             frozenMillis = 45_000,
         ),
-        DeviceChecks(unrestricted = false, autostartAvailable = true),
+        DeviceChecks(unrestricted = false, appSettingsAvailable = true),
         HeartbeatActions(),
     )
 }

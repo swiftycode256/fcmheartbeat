@@ -136,10 +136,12 @@ Do **not** count ticks: `delay(1000)` overshoots by a few ms per tick, which add
 ## Power management detection
 
 - "Unrestricted" = `PowerManager.isIgnoringBatteryOptimizations(packageName)`. Also treat `ActivityManager.isBackgroundRestricted()` (API 28+) as restricted.
-- Re-check on every `ON_RESUME`. There is no public broadcast for this setting, and resume covers the user coming back from Settings.
-- The card gets action buttons:
-  - **Battery settings**: `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` (needs the `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` permission), falling back to the app details page
-  - **Autostart**: `com.miui.securitycenter/com.miui.permcenter.autostart.AutoStartManagementActivity`, guarded by try/catch and hidden if it does not resolve
+- Re-check every time the activity comes to the foreground (`ON_RESUME`). There is no public broadcast for this setting. Resume covers the user coming back from Settings, from another app or from the switcher. The card therefore disappears once the setting is "Unrestricted" and shows again if it is later changed back.
+- The card has one action, **Open app settings**: `com.miui.securitycenter/com.miui.appmanager.ApplicationsDetailsActivity` with extras `package_name` (our package) and `miui.intent.extra.USER_ID` (int).
+  - These extras were read from the activity's `onCreate` in the device's SecurityCenter APK, and launching it was verified on HyperOS OS4.0.4.0.
+  - The page holds both the battery saver ("Unrestricted") and Autostart switches.
+  - The button is shown only if the component resolves and is exported, so on non-Xiaomi devices the card has no button. The launch is wrapped in try/catch.
+  - Package visibility comes from `<queries><package android:name="com.miui.securitycenter" /></queries>`.
 - Autostart status cannot be read through a public API. It is only mentioned in the text, never detected.
 
 ## Diagnostics button
@@ -324,4 +326,4 @@ Do **not** count ticks: `delay(1000)` overshoots by a few ms per tick, which add
 ## Remaining notes
 
 - **`applicationId`** is still `com.example.fcmheartbeat`. Change it before any release.
-- **Distribution:** `USE_EXACT_ALARM` and `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` are restricted under Google Play policy. Both are fine for sideloading or GitHub releases. If the app is ever published on Play, revisit them.
+- **Distribution:** `USE_EXACT_ALARM` is restricted under Google Play policy. It is fine for sideloading or GitHub releases. If the app is ever published on Play, revisit it. (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` was dropped along with the old "Battery settings" button.)

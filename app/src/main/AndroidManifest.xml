@@ -17,10 +17,7 @@
         android:name="android.permission.SCHEDULE_EXACT_ALARM"
         android:maxSdkVersion="32" />
 
-    <!-- Lets the power-management card open the system "allow background" prompt -->
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-
-    <!-- Android 11+ package visibility: GMS (checks + bindings) and the MIUI/HyperOS Autostart page -->
+    <!-- Android 11+ package visibility: GMS (checks + bindings) and the HyperOS app settings page -->
     <queries>
         <package android:name="com.google.android.gms" />
         <package android:name="com.miui.securitycenter" />

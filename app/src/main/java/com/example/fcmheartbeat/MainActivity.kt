@@ -95,8 +95,7 @@ private fun HeartbeatRoute() {
                     scope.launch { snackbarHostState.showSnackbar(diagnosticsUnavailable) }
                 }
             },
-            onOpenBatterySettings = { PowerChecks.openBatterySettings(context) },
-            onOpenAutostart = { PowerChecks.openAutostartSettings(context) },
+            onOpenAppSettings = { PowerChecks.openAppSettings(context) },
             onAllowNotifications = {
                 // Ask again while the system still allows it; after that, only Settings can grant it.
                 val canAsk = needsNotificationPermission(context) && activity != null &&
