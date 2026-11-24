@@ -1,4 +1,8 @@
-# FCMHeartbeat (小米HyperOS）
+# FCMHeartbeat (为小米HyperOS设计）
+
+[English](README.md) | **中文**
+
+<img src="imgs/icon.svg" alt="Icon" width="100">
 
 一个可以防止小米HyperOS限制谷歌FCM通知推送服务的简易辅助工具。无需root或Shizuku；开箱即用即可。
 
@@ -49,6 +53,10 @@ FCMHeartbeat通过创建一个虚拟显示实例来让系统视为“受保护�
 该工具的服务也会每4秒向谷歌广告识别服务发送请求，导致快速冻结机制重新把FCM变成活跃状态。它会重复解冻FCM进程来保证其后台活跃。因为该快速冻结机制不会限制网络连接，所以重新冻结时不会直接导致FCM断开连接。
 
 该机制经过测试在运行HyperOS版本`4.0.4.0.XPLCNXM.D02`的REDMI Turbo 5 Max上证明有效。系统日志显示Greezer主动跳过了冻结机制的执行，并且期间没有看到任何FCM断开连接的迹象。 
+
+| 使用工具前 | 使用工具后 |
+|---|---|
+| ![disconnected](imgs/disconnected.jpg) | ![connected](imgs/connected.jpg) |
 
 ## 使用方法
 

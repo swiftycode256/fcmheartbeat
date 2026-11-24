@@ -1,5 +1,9 @@
 # FCMHeartbeat (for Xiaomi HyperOS)
 
+**English** | [中文](README.zh.md)
+
+<img src="imgs/icon.svg" alt="Icon" width="100">
+
 A simple, always-running helper tool app that stops Xiaomi HyperOS from restricting the background activity of Google Play's FCM (Cloud Messaging) services. No root or Shizuku required; just install it on your device and it works out of the box.
 
 ## Technical analysis
@@ -51,6 +55,11 @@ Nothing is ever rendered in it, so there is almost no battery life impact, and i
 The service also pings the Google Ads ID service every 4 seconds, which causes the other quick-freeze mechanism to temporarily unfreeze it. It repeatedly unfreezes the process to make FCM stay active in the background. The quick-freeze mechanism does not close network sockets, so it won't disconnect FCM when it freezes the process again.
 
 The app is tested to work on HyperOS version `4.0.4.0.XPLCNXM.D02` running on REDMI Turbo 5 Max. Log messages show Greezer skipped the freeze mechanism when the app is running, and FCM disconnect errors didn't appear.
+
+| Before | After |
+|---|---|
+| ![disconnected](imgs/disconnected.jpg) | ![connected](imgs/connected.jpg) |
+
 
 ## Usage instructions
 
