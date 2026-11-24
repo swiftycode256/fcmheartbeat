@@ -22,7 +22,7 @@ Greezer also ignores Android's process priority: increasing the GMS process prio
 
 ---
 
-However, Greezer does not restrict FCM's background activity if a "protected" app holds service bindings to GMS (and is not frozen by the system).
+However, Greezer does not restrict FCM's background activity if a "protected" app holds service bindings to GMS.
 
 The system considers an app as "protected" if it's the current input method (screen on only), owns a virtual display instance, is using the camera/vibration, or is actively using audio or location services besides being the current app on screen.
 The freeze mechanism is explicitly skipped by Greezer under these circumstances as shown in log messages.
@@ -30,11 +30,13 @@ The freeze mechanism is explicitly skipped by Greezer under these circumstances 
 Therefore, an app only holding a wake lock and GMS service bindings does not make it "protected"; it also needs to satisfy at least one of the conditions mentioned above for it to work, which is what FCMHeartbeat does.
 Gboard (as the current input method) was also considered as a "protected" app in HyperOS 3, but that's no longer the case in HyperOS 4 when the screen turns off, which explains why it no longer works.
 
+While the quick-freeze mechanism is still enforced, it can be mitigated by frequently pinging GMS services to keep it active.
+
 ## Other systems (code analysis only)
 
 ### ColorOS 17
 
-ColorOS only restricts the background activity of Google Play services if Google servers are unreachable through the current network. Otherwise, it doesn't apply any specific background restrictions on it.
+ColorOS only restricts the background activity and network connections of Google Play services if Google servers are unreachable through the current network. Otherwise, it doesn't apply any specific background restrictions on it.
 The only mechanism impacting its background activity is the "Sleep standby optimization" feature, which disables all network connections except for system services. Disabling it in battery settings will prevent such restrictions.
 **Therefore, FCMHeartbeat isn't necessary on ColorOS.**
 
@@ -53,7 +55,7 @@ The app is tested to work on HyperOS version `4.0.4.0.XPLCNXM.D02` running on RE
 ## Usage instructions
 
 - Enable Autostart permissions and set power management mode to "Unrestricted" for this app
-- Open the app for it to start running in the background (no additional "Start" button needed)
+- Open the app for it to start running in the background
 - Click the diagnostics button in the toolbar to check the FCM Diagnostics page
     - You might have to double-click the "Events" button to refresh the status properly
-- Recommended: Lock the app window in the task switcher to reduce interruptions to its background process
+- Lock the app window in the task switcher to reduce interruptions to its background process. The app does not restart when closed using the "clean memory" button in the app switcher.
