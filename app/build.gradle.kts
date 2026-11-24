@@ -53,6 +53,10 @@ android {
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
         }
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug" // helps distinguish versions in Settings
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
