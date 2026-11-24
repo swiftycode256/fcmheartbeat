@@ -12,7 +12,7 @@ On certain Xiaomi HyperOS versions, its power management features actively restr
 
 ---
 
-The restrictions come from HyperOS's own process freezer, **Greezer**. This only applies to China ROMs, as Greezer excempts all Google apps from background restrictions on Global ROMs. 
+The restrictions come from HyperOS's own process freezer, **Greezer**. This only applies to China ROMs, as Greezer exempts all Google apps from background restrictions on Global ROMs. 
 
 About 30 seconds after the screen turns off, Greezer freezes the GMS process with the reason `screen_off` (also `tobg` and `from system`) and closes its network sockets while blocking new connections, causing its connection to close immediately with `ERR_IO_FIN`.
 Any wake-up (e.g. a binder call, an incoming broadcast, a provider query) only unfreezes GMS for 5 seconds before it gets frozen again.
